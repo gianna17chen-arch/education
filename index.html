@@ -32,31 +32,24 @@
 <body>
     <div id="root"></div>
 
-    <script type="text/babel" data-type="module">
-        const { useState, useEffect, useMemo, useRef } = React;
-        
-        // --- Firebase 模組載入 ---
+    <!-- 新增：獨立的 module script 載入 Firebase -->
+    <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- Firebase 設定 ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyBnjfbh1ow4j6gXBP9XeBQkCt_cs7Uv3ds",
-            authDomain: "education-b38d5.firebaseapp.com",
-            projectId: "education-b38d5",
-            storageBucket: "education-b38d5.firebasestorage.app",
-            messagingSenderId: "450320441540",
-            appId: "1:450320441540:web:888014b1380a473a142991",
-            measurementId: "G-70DQ70W0B8"
+        window.FB = {
+            initializeApp, getAuth, signInAnonymously, signInWithCustomToken,
+            onAuthStateChanged, getFirestore, doc, getDoc, setDoc
         };
+    </script>
+
+    <!-- Babel script 中不可以有任何 import 語句 -->
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useRef } = React;
+        
         const appId = 'free-time-adventure-v2';
         const apiKey = ""; // Canvas 環境會自動注入，部署時請更換為您的真實金鑰
-
-        // 初始化 Firebase
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
 
         // --- 工具函式：PCM 轉 WAV ---
         function pcmToWav(pcmBase64, sampleRate = 24000) {
@@ -96,6 +89,7 @@
         // --- 主程式組件 ---
         const App = () => {
             const [user, setUser] = useState(null);
+            const [db, setDb] = useState(null);
             const [authError, setAuthError] = useState(null);
             const [view, setView] = useState('welcome');
             const [currentIndex, setCurrentIndex] = useState(0);
@@ -105,33 +99,73 @@
             const [selectedMcq, setSelectedMcq] = useState(null);
             const [ttsStatus, setTtsStatus] = useState({}); // { [text]: 'idle' | 'loading' | 'playing' }
 
-            // 自動登入流程 
+            // 自動登入與 Firebase 初始化輪詢
             useEffect(() => {
-                const initAuth = async () => {
-                    try {
-                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                            try {
-                                await signInWithCustomToken(auth, __initial_auth_token);
-                            } catch (tokenError) {
-                                console.warn("Token 不匹配，改用匿名登入...", tokenError);
-                                await signInAnonymously(auth);
-                            }
-                        } else {
-                            await signInAnonymously(auth);
+                let checkCount = 0;
+                const interval = setInterval(() => {
+                    checkCount++;
+                    if (window.FB) {
+                        clearInterval(interval);
+                        try {
+                            const firebaseConfig = {
+                                apiKey: "AIzaSyBnjfbh1ow4j6gXBP9XeBQkCt_cs7Uv3ds",
+                                authDomain: "education-b38d5.firebaseapp.com",
+                                projectId: "education-b38d5",
+                                storageBucket: "education-b38d5.firebasestorage.app",
+                                messagingSenderId: "450320441540",
+                                appId: "1:450320441540:web:888014b1380a473a142991",
+                                measurementId: "G-70DQ70W0B8"
+                            };
+                            const app = window.FB.initializeApp(firebaseConfig);
+                            const authInstance = window.FB.getAuth(app);
+                            const dbInstance = window.FB.getFirestore(app);
+                            setDb(dbInstance);
+
+                            // 處理認證邏輯 (包含 Custom Token fallback)
+                            const doAuth = async () => {
+                                try {
+                                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                                        try {
+                                            await window.FB.signInWithCustomToken(authInstance, __initial_auth_token);
+                                        } catch (tokenError) {
+                                            console.warn("Token 不匹配，改用匿名登入...", tokenError);
+                                            await window.FB.signInAnonymously(authInstance);
+                                        }
+                                    } else {
+                                        await window.FB.signInAnonymously(authInstance);
+                                    }
+                                } catch (err) {
+                                    console.warn("登入失敗，將以離線/無快取模式運行:", err.message);
+                                    setAuthError(err.message);
+                                }
+                            };
+                            doAuth();
+
+                            window.FB.onAuthStateChanged(authInstance, (u) => {
+                                if (u) setUser(u);
+                                else window.FB.signInAnonymously(authInstance).catch(e => {
+                                    console.warn("登入失敗:", e.message);
+                                    setAuthError(e.message);
+                                });
+                            });
+                        } catch (e) {
+                            setAuthError("Firebase Init Error: " + e.message);
                         }
-                    } catch (err) {
-                        console.warn("登入失敗，將以離線/無快取模式運行:", err.message);
-                        setAuthError(err.message);
+                    } else if (checkCount > 50) {
+                        clearInterval(interval);
+                        setAuthError("Firebase SDK 載入超時");
                     }
-                };
-                initAuth();
-                
-                const unsubscribe = onAuthStateChanged(auth, u => setUser(u));
-                return () => unsubscribe();
+                }, 200);
+                return () => clearInterval(interval);
             }, []);
 
             // 高容錯語音播放核心
             const handleSpeak = async (text) => {
+                if (!db) {
+                    console.warn("Firebase 尚未就緒");
+                    return;
+                }
+
                 // 防抖保護，避免重複點擊
                 if (ttsStatus[text] === 'loading' || ttsStatus[text] === 'playing') return;
                 
@@ -144,9 +178,9 @@
                     // 1. 嘗試從 Firestore 讀取快取 (若有登入)
                     if (user) {
                         try {
-                            const safeId = btoa(encodeURIComponent(text)).replace(/[/+=]/g, '_');
-                            cacheRef = doc(db, 'artifacts', appId, 'public', 'data', 'tts_cache', safeId);
-                            const cacheSnap = await getDoc(cacheRef);
+                            const safeId = btoa(unescape(encodeURIComponent(text))).replace(/[/+=]/g, '_');
+                            cacheRef = window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'audio_cache', safeId);
+                            const cacheSnap = await window.FB.getDoc(cacheRef);
                             if (cacheSnap.exists()) {
                                 pcmData = cacheSnap.data().base64;
                             }
@@ -177,7 +211,7 @@
                         // 3. 嘗試將生成的音訊存入快取 (失敗也不阻擋播放)
                         if (user && cacheRef) {
                             try {
-                                await setDoc(cacheRef, { base64: pcmData, text, createdAt: new Date().toISOString() });
+                                await window.FB.setDoc(cacheRef, { base64: pcmData, text, createdAt: new Date().toISOString() });
                             } catch (fsErr) {
                                 console.warn("無法寫入 Firestore 快取 (可能是自訂專案尚未開放寫入權限)", fsErr);
                             }
@@ -194,7 +228,7 @@
                         URL.revokeObjectURL(audioUrl);
                     };
 
-                    // 關鍵修正：捕捉 audio.play() 的 Promise 拒絕，避免出現 Canvas 錯誤彈窗
+                    // 捕捉 audio.play() 的 Promise 拒絕，避免出現 Canvas 錯誤彈窗
                     audio.play().catch(playErr => {
                         console.error("播放音訊遭拒絕 (可能是瀏覽器自動播放限制):", playErr);
                         setTtsStatus(prev => ({ ...prev, [text]: 'idle' }));
@@ -285,7 +319,6 @@
                             {user && <p className="text-green-500 font-bold bg-green-50 px-4 py-2 rounded-lg">✅ 雲端服務連線成功</p>}
                         </div>
 
-                        {/* 修正：移除 disabled 鎖定，讓無法登入的用戶依然可以遊玩 */}
                         <button 
                             onClick={() => setView('menu')}
                             className="btn-primary w-full py-5 rounded-full text-2xl font-bold shadow-xl hover:scale-[1.02] transition-transform"
