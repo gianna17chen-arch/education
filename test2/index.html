@@ -1,1 +1,369 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Magic Phonics World - Short a vs Long a</title>
+    <!-- React & ReactDOM CDN -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel for JSX transpilation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
+        body { font-family: 'Noto Sans TC', sans-serif; }
+        .animate-bounce-slow { animation: bounce 3s infinite; }
+        @keyframes bounce { 0%, 100% { transform: translateY(-5%); } 50% { transform: translateY(0); } }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #f59e0b; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-orange-50">
+    <div id="root"></div>
 
+    <!-- Firebase SDK Implementation (Strict Architecture) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        window.FB = { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, getFirestore, doc, getDoc, setDoc, collection };
+    </script>
+
+    <script type="text/babel">
+        // --- Icon Components ---
+        const IconWrapper = ({ children, size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{children}</svg>
+        );
+        const BookOpen = (p) => <IconWrapper {...p}><path d="M2 3h6a4 4 0 0 1 4 4v14a4 4 0 0 0-4-4H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a4 4 0 0 1 4-4h6z"/></IconWrapper>;
+        const Sparkles = (p) => <IconWrapper {...p}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></IconWrapper>;
+        const MessageSquare = (p) => <IconWrapper {...p}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></IconWrapper>;
+        const ChevronRight = (p) => <IconWrapper {...p}><path d="m9 18 6-6-6-6"/></IconWrapper>;
+        const ChevronLeft = (p) => <IconWrapper {...p}><path d="m15 18-6-6 6-6"/></IconWrapper>;
+        const Home = (p) => <IconWrapper {...p}><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></IconWrapper>;
+        const Volume2 = (p) => <IconWrapper {...p}><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></IconWrapper>;
+        const Loader2 = (p) => <IconWrapper {...p} className={`${p.className} animate-spin`}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></IconWrapper>;
+        const Star = (p) => <IconWrapper {...p}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></IconWrapper>;
+        const Heart = (p) => <IconWrapper {...p}><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></IconWrapper>;
+
+        const { useState, useEffect, useRef } = React;
+
+        const App = () => {
+            const [currentPage, setCurrentPage] = useState('home');
+            const [activeGroup, setActiveGroup] = useState(null);
+            const [step, setStep] = useState(0);
+            const [isSpeaking, setIsSpeaking] = useState(null);
+            const [debugMsg, setDebugMsg] = useState("🚀 System: Initializing Phonics Engine...");
+            const [cacheStatus, setCacheStatus] = useState({});
+            const [user, setUser] = useState(null);
+            const [db, setDb] = useState(null);
+
+            const apiKey = ""; // Keep empty for deployment; generates only in preview mode.
+
+            const appId = "phonics-magic-a-mimi-pro";
+            const firebaseConfig = {
+                apiKey: "AIzaSyBnjfbh1ow4j6gXBP9XeBQkCt_cs7Uv3ds",
+                authDomain: "education-b38d5.firebaseapp.com",
+                projectId: "education-b38d5",
+                storageBucket: "education-b38d5.firebasestorage.app",
+                messagingSenderId: "450320441540",
+                appId: "1:450320441540:web:888014b1380a473a142991",
+                measurementId: "G-70DQ70W0B8"
+            };
+
+            const phonicsData = {
+                short_a: {
+                    title: "Short a (/æ/)",
+                    rule: "短母音 a 發音像是在大笑時的 /æ/！嘴巴要張得大大的，像個大蘋果。",
+                    ruleHint: "通常出現在兩個子音中間 (CVC)，比如 C-a-t。",
+                    accentColor: "bg-rose-400",
+                    textColor: "text-rose-600",
+                    words: [
+                        { word: "Cat", trans: "小貓", icon: "🐱" },
+                        { word: "Apple", trans: "蘋果", icon: "🍎" },
+                        { word: "Hat", trans: "帽子", icon: "👒" },
+                        { word: "Jam", trans: "果醬", icon: "🍓" },
+                        { word: "Bat", trans: "蝙蝠", icon: "🦇" }
+                    ],
+                    comparisons: [
+                        { id: 'sa1', pair: "Tap vs. Tape", sentence: "Do not tap on the sticky tape.", trans: "不要在黏黏的膠帶上輕敲。" },
+                        { id: 'sa2', pair: "Can vs. Cane", sentence: "The man with a cane has a can.", trans: "拿著手杖的男人有一個罐子。" },
+                        { id: 'sa3', pair: "Mad vs. Made", sentence: "I am mad that you made a mess.", trans: "我很生氣你弄得一團糟。" }
+                    ]
+                },
+                long_a: {
+                    title: "Long a (/eɪ/)",
+                    rule: "長母音 a 發字母本身的音 /eɪ/！通常是後面多了一個 Magic e 魔法師。",
+                    ruleHint: "Magic e 不發音，但它會揮揮魔法棒，讓前面的 a 變成長音！",
+                    accentColor: "bg-amber-400",
+                    textColor: "text-amber-600",
+                    words: [
+                        { word: "Cake", trans: "蛋糕", icon: "🎂" },
+                        { word: "Lake", trans: "湖泊", icon: "🏞️" },
+                        { word: "Name", trans: "名字", icon: "🏷️" },
+                        { word: "Snake", trans: "蛇", icon: "🐍" },
+                        { word: "Game", trans: "遊戲", icon: "🎮" }
+                    ],
+                    comparisons: [
+                        { id: 'la1', pair: "Hat vs. Hate", sentence: "I hate wearing this silly hat.", trans: "我討厭戴這頂預蠢的帽子。" },
+                        { id: 'la2', pair: "Pan vs. Pane", sentence: "The pan hit the glass window pane.", trans: "平底鍋撞到了玻璃窗格。" },
+                        { id: 'la3', pair: "Rat vs. Rate", sentence: "The rat is running at a fast rate.", trans: "老鼠正以很快的速度奔跑。" }
+                    ]
+                }
+            };
+
+            // --- Firebase Pooling Initialization ---
+            useEffect(() => {
+                setDebugMsg("⌛ Waiting for Firebase SDK...");
+                const checkFB = setInterval(async () => {
+                    if (window.FB) {
+                        clearInterval(checkFB);
+                        try {
+                            const app = window.FB.initializeApp(firebaseConfig);
+                            const auth = window.FB.getAuth(app);
+                            const firestore = window.FB.getFirestore(app);
+                            await window.FB.signInAnonymously(auth);
+                            window.FB.onAuthStateChanged(auth, (currentUser) => {
+                                setUser(currentUser);
+                                setDb(firestore);
+                                setDebugMsg(`✅ Ready: Connected as ${currentUser?.uid.slice(0, 6)}...`);
+                            });
+                        } catch (err) {
+                            setDebugMsg(`❌ Firebase Error: ${err.message}`);
+                        }
+                    }
+                }, 500);
+                return () => clearInterval(checkFB);
+            }, []);
+
+            const generateSafeId = (text) => {
+                return btoa(unescape(encodeURIComponent(text))).replace(/[/+=]/g, '_');
+            };
+
+            const pcmToWav = (pcmBase64, sampleRate = 24000) => {
+                const binaryString = window.atob(pcmBase64);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
+                const wavBuffer = new ArrayBuffer(44 + bytes.length);
+                const wavView = new DataView(wavBuffer);
+                const writeString = (v, o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+                writeString(wavView, 0, 'RIFF');
+                wavView.setUint32(4, 36 + bytes.length, true);
+                writeString(wavView, 8, 'WAVE');
+                writeString(wavView, 12, 'fmt ');
+                wavView.setUint32(16, 16, true);
+                wavView.setUint16(20, 1, true);
+                wavView.setUint16(22, 1, true);
+                wavView.setUint32(24, sampleRate, true);
+                wavView.setUint32(28, sampleRate * 2, true);
+                wavView.setUint16(32, 2, true);
+                wavView.setUint16(34, 16, true);
+                writeString(wavView, 36, 'data');
+                wavView.setUint32(40, bytes.length, true);
+                new Uint8Array(wavBuffer, 44).set(bytes);
+                return URL.createObjectURL(new Blob([wavBuffer], { type: 'audio/wav' }));
+            };
+
+            const handleSpeak = async (text, id) => {
+                if (!db || !user) {
+                    setDebugMsg("❌ Error: Firebase not ready.");
+                    return;
+                }
+                if (isSpeaking) return;
+                setIsSpeaking(id);
+
+                const safeId = generateSafeId(text);
+                const cacheRef = window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'audio_cache', safeId);
+                
+                try {
+                    const cacheDoc = await window.FB.getDoc(cacheRef);
+                    if (cacheDoc.exists()) {
+                        setDebugMsg("✅ Cache Found!");
+                        const audioData = cacheDoc.data().audioBase64;
+                        const audio = new Audio(pcmToWav(audioData));
+                        audio.onended = () => { setIsSpeaking(null); setCacheStatus(prev => ({...prev, [id]: 'cached'})); };
+                        audio.play();
+                    } else {
+                        setDebugMsg("⌛ Generating new audio...");
+                        const hasChinese = /[\u4e00-\u9fa5]/.test(text);
+                        let speechText = text;
+                        // IPA translation for TTS clarity
+                        const ipaMap = { '/æ/': 'short a sound', '/eɪ/': 'long a sound' };
+                        Object.keys(ipaMap).forEach(key => speechText = speechText.split(key).join(ipaMap[key]));
+
+                        const prompt = hasChinese 
+                            ? `請用親切標準的繁體中文（台灣口音）朗讀內容，如果是英文請清楚唸出來：${speechText}` 
+                            : `Say clearly in English: ${speechText}`;
+
+                        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                contents: [{ parts: [{ text: prompt }] }],
+                                generationConfig: {
+                                    responseModalities: ["AUDIO"],
+                                    speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } }
+                                }
+                            })
+                        });
+
+                        const result = await response.json();
+                        const pcmData = result.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+
+                        if (pcmData) {
+                            setDebugMsg("💾 Saving to Cloud Cache...");
+                            await window.FB.setDoc(cacheRef, {
+                                audioBase64: pcmData,
+                                text: text,
+                                createdAt: new Date().toISOString()
+                            });
+                            const audio = new Audio(pcmToWav(pcmData));
+                            audio.onended = () => { setIsSpeaking(null); setCacheStatus(prev => ({...prev, [id]: 'cached'})); };
+                            audio.play();
+                        } else {
+                            if (!apiKey) {
+                                setDebugMsg("⚠️ 無快取且環境金鑰失效：請在預覽模式生成語音。");
+                            } else {
+                                throw new Error("API failed to return audio.");
+                            }
+                            setIsSpeaking(null);
+                        }
+                    }
+                } catch (err) {
+                    setDebugMsg(`❌ Error: ${err.message}`);
+                    setIsSpeaking(null);
+                }
+            };
+
+            const nextStep = () => step < 2 ? setStep(step + 1) : setCurrentPage('home');
+            const prevStep = () => step > 0 ? setStep(step - 1) : setCurrentPage('home');
+
+            const StatusBadge = ({ id }) => {
+                if (isSpeaking === id) return <span className="ml-2 text-sm animate-pulse text-amber-600 font-bold">🔊 播放中...</span>;
+                if (cacheStatus[id] === 'cached') return <span className="ml-2 text-sm text-emerald-500 font-bold">✅ 已快取</span>;
+                return <span className="ml-2 text-sm text-slate-400 opacity-50 italic">⌛ 未快取</span>;
+            };
+
+            const renderHome = () => (
+                <div className="flex flex-col items-center justify-center min-h-screen p-8 space-y-12">
+                    <div className="text-center space-y-6">
+                        <div className="flex justify-center gap-4 mb-2">
+                            <Heart className="text-pink-400 fill-pink-400 animate-pulse" size={48} />
+                            <Star className="text-amber-400 fill-amber-400 animate-bounce-slow" size={56} />
+                            <Heart className="text-pink-400 fill-pink-400 animate-pulse" size={48} />
+                        </div>
+                        <h1 className="text-5xl md:text-8xl font-black tracking-tight text-orange-600 drop-shadow-md">Magic 'a' World</h1>
+                        <p className="text-xl md:text-3xl text-orange-800/70 font-bold bg-white/60 py-2 px-8 rounded-full inline-block border-2 border-orange-100 shadow-sm">
+                            一起來學習短母音與長母音 a 吧！
+                        </p>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 w-full max-w-4xl px-4 text-center">
+                        {Object.entries(phonicsData).map(([key, data]) => (
+                            <button key={key} onClick={() => { setActiveGroup(key); setStep(0); setCurrentPage('lesson'); }} className="group bg-white border-4 border-dashed border-orange-200 hover:border-orange-400 rounded-[3rem] p-8 md:p-12 transition-all duration-300 hover:scale-105 shadow-xl relative overflow-hidden">
+                                <div className={`absolute -right-4 -top-4 w-24 h-24 rounded-full ${data.accentColor} opacity-20`} />
+                                <div className="text-6xl md:text-8xl mb-6">{key === 'short_a' ? '🍎' : '🎂'}</div>
+                                <div className={`text-3xl md:text-5xl font-black mb-2 ${data.textColor}`}>{data.title}</div>
+                                <div className="text-xl md:text-2xl text-slate-500 font-medium italic">Start Adventure</div>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            );
+
+            const renderLesson = () => {
+                const data = phonicsData[activeGroup];
+                if (!data) return null;
+                return (
+                    <div className="flex flex-col min-h-screen pb-24">
+                        <div className="flex items-center justify-between p-4 md:p-8 bg-white/80 border-b-4 border-orange-100 backdrop-blur-sm sticky top-0 z-50">
+                            <button onClick={() => setCurrentPage('home')} className="flex items-center gap-2 text-xl md:text-2xl font-bold text-orange-600 hover:text-orange-400 transition-colors"><Home size={32} /> 回主選單</button>
+                            <div className={`text-2xl md:text-4xl font-black ${data.textColor}`}>{data.title}</div>
+                        </div>
+                        <div className="flex-1 flex flex-col items-center justify-center p-4 md:p-8">
+                            <div className="w-full max-w-6xl bg-white/95 p-6 md:p-12 rounded-[2rem] md:rounded-[4rem] shadow-2xl border-4 border-white relative overflow-hidden">
+                                {step === 0 && (
+                                    <div className="text-center space-y-10 animate-in zoom-in duration-500">
+                                        <div className={`${data.accentColor} inline-block p-6 rounded-full text-white mb-4 shadow-lg`}><Sparkles size={64} /></div>
+                                        <h2 className="text-5xl md:text-7xl font-black text-slate-700">發音規則</h2>
+                                        <div className="space-y-6">
+                                            <p className="text-3xl md:text-5xl leading-relaxed font-bold px-4 md:px-12">{data.rule}</p>
+                                            <div className="bg-orange-50 p-6 md:p-8 rounded-3xl border-2 border-orange-200 inline-block">
+                                                <p className="text-2xl md:text-3xl text-orange-900/70 italic font-bold">💡 {data.ruleHint}</p>
+                                            </div>
+                                        </div>
+                                        <button onClick={() => handleSpeak(data.rule, 'rule')} className="mt-6 flex items-center gap-4 mx-auto px-8 py-4 bg-slate-100 hover:bg-slate-200 rounded-2xl text-xl md:text-2xl font-bold transition-all hover:scale-105 shadow-sm">
+                                            <Volume2 className="text-orange-500" /> 聽規則發音 <StatusBadge id="rule" />
+                                        </button>
+                                    </div>
+                                )}
+                                {step === 1 && (
+                                    <div className="animate-in slide-in-from-right duration-500">
+                                        <h2 className="text-4xl md:text-6xl font-black text-center mb-8 md:mb-16 flex items-center justify-center gap-6"><BookOpen size={56} className={data.textColor} /> 精選單字卡</h2>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 text-center">
+                                            {data.words.map((item, idx) => (
+                                                <div key={idx} className="bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] border-4 border-orange-50 shadow-lg hover:shadow-2xl transition-all group relative">
+                                                    <button onClick={() => handleSpeak(item.word, `w-${idx}`)} className={`absolute top-6 right-6 p-4 rounded-2xl ${isSpeaking === `w-${idx}` ? 'bg-orange-400 text-white' : 'bg-orange-50 text-orange-400 shadow-sm group-hover:scale-110'}`}>
+                                                        {isSpeaking === `w-${idx}` ? <Loader2 size={32} /> : <Volume2 size={32} />}
+                                                    </button>
+                                                    <div className="text-6xl md:text-8xl mb-4 md:mb-6">{item.icon}</div>
+                                                    <div className={`text-4xl md:text-6xl font-black mb-2 ${data.textColor}`}>{item.word}</div>
+                                                    <div className="text-2xl md:text-3xl text-slate-400 font-bold">{item.trans}</div>
+                                                    <StatusBadge id={`w-${idx}`} />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                {step === 2 && (
+                                    <div className="animate-in slide-in-from-bottom duration-500">
+                                        <h2 className="text-4xl md:text-6xl font-black text-center mb-8 md:mb-16 flex items-center justify-center gap-6"><MessageSquare size={56} className={data.textColor} /> 混淆字對抗賽！</h2>
+                                        <div className="space-y-6 md:space-y-10">
+                                            {data.comparisons.map((item, idx) => (
+                                                <div key={idx} className="bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] border-4 border-orange-50 shadow-xl relative group flex flex-col md:flex-row items-center gap-6 md:gap-8">
+                                                    <div className="flex-1 text-center md:text-left">
+                                                        <div className={`text-2xl md:text-3xl font-black mb-2 md:mb-4 uppercase tracking-widest ${data.textColor}`}>{item.pair}</div>
+                                                        <p className="text-3xl md:text-5xl font-black leading-tight mb-2 md:mb-4 text-slate-700">
+                                                            {item.sentence.split(' ').map((word, i) => {
+                                                                const targets = ['cat', 'cake', 'tap', 'tape', 'can', 'cane', 'mad', 'made', 'hat', 'hate', 'pan', 'pane', 'rat', 'rate'];
+                                                                return <span key={i} className={targets.includes(word.toLowerCase().replace(/[^a-z-]/g, '')) ? "text-orange-500 underline underline-offset-8 mx-1 md:mx-2" : "mx-1 md:mx-2"}>{word}</span>;
+                                                            })}
+                                                        </p>
+                                                        <p className="text-xl md:text-3xl text-slate-400 font-bold">{item.trans}</p>
+                                                    </div>
+                                                    <button onClick={() => handleSpeak(item.sentence, item.id)} className={`p-6 md:p-8 rounded-3xl transition-all ${isSpeaking === item.id ? 'bg-orange-400 text-white animate-pulse' : 'bg-orange-50 text-orange-600 hover:bg-orange-100 shadow-md'}`}>
+                                                        {isSpeaking === item.id ? <Loader2 size={48} /> : <Volume2 size={48} />}
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <div className="p-4 md:p-8 flex justify-between fixed bottom-12 w-full left-0 z-40 bg-white/50 backdrop-blur-sm">
+                            <button onClick={prevStep} className="px-6 md:px-12 py-4 md:py-6 bg-white border-4 border-orange-100 rounded-3xl text-xl md:text-3xl font-black text-orange-400 shadow-md flex items-center gap-3 transition-all hover:bg-orange-50"><ChevronLeft size={40} /> 上一頁</button>
+                            <button onClick={nextStep} className={`px-8 md:px-16 py-4 md:py-6 ${data.accentColor} rounded-3xl text-xl md:text-3xl font-black text-white shadow-xl flex items-center gap-3 transition-all hover:opacity-90`}>{step === 2 ? "結束本課" : "下一頁"} <ChevronRight size={40} /></button>
+                        </div>
+                    </div>
+                );
+            };
+
+            return (
+                <div className="font-sans min-h-screen selection:bg-orange-200">
+                    {currentPage === 'home' ? renderHome() : renderLesson()}
+                    <div className="fixed bottom-0 left-0 w-full bg-slate-900 text-cyan-400 px-4 py-2 text-sm font-mono flex items-center justify-between z-[9999] border-t border-cyan-900/50">
+                        <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse"></span> {debugMsg}</div>
+                        <div className="text-xs text-slate-500 uppercase">AppID: {appId}</div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
