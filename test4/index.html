@@ -1,1 +1,507 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Space Career Explorer - Tr. Mimi's Class</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & Babel CDNs -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap');
+        body { 
+            font-family: 'Nunito', sans-serif; 
+            background-color: #f8fafc; 
+            margin: 0;
+            overflow-x: hidden;
+        }
+        .macaron-pink { background-color: #FFD1DC; }
+        .macaron-blue { background-color: #B3E5FC; }
+        .macaron-yellow { background-color: #FFF9C4; }
+        .macaron-purple { background-color: #E1BEE7; }
+        .macaron-green { background-color: #C8E6C9; }
+        .macaron-orange { background-color: #FFE0B2; }
+        
+        .space-card {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 2px solid transparent;
+            user-select: none;
+        }
+        .space-card:hover {
+            transform: translateY(-5px) scale(1.02);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            border-color: #6366f1;
+        }
 
+        .floating {
+            animation: float 4s ease-in-out infinite;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-15px); }
+        }
+
+        .star-bg {
+            background: radial-gradient(circle at center, #1e1b4b 0%, #0f172a 100%);
+        }
+
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        @keyframes pulse-soft {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        .loading-pulse { animation: pulse-soft 1s infinite; }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+        .animate-shake { animation: shake 0.2s ease-in-out 2; }
+        
+        .fade-in { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, collection, query, orderBy, limit, onSnapshot, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBnjfbh1ow4j6gXBP9XeBQkCt_cs7Uv3ds",
+            authDomain: "education-b38d5.firebaseapp.com",
+            projectId: "education-b38d5",
+            storageBucket: "education-b38d5.firebasestorage.app",
+            messagingSenderId: "450320441540",
+            appId: "1:450320441540:web:888014b1380a473a142991",
+            measurementId: "G-70DQ70W0B8"
+        };
+        
+        const appId = 'space-career-explorer-v3'; // 更新版本 ID
+        const apiKey = ""; // Canvas 自動注入
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // --- PCM16 to WAV Helper ---
+        const pcmToWav = (base64Data, sampleRate = 24000) => {
+            if (!base64Data) return null;
+            try {
+                const cleaned = base64Data.replace(/-/g, '+').replace(/_/g, '/').replace(/\s/g, '');
+                const binaryString = window.atob(cleaned);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
+                const buffer = new ArrayBuffer(44 + bytes.length);
+                const view = new DataView(buffer);
+                const writeString = (o, s) => { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)); };
+                writeString(0, 'RIFF');
+                view.setUint32(4, 36 + bytes.length, true);
+                writeString(8, 'WAVE');
+                writeString(12, 'fmt ');
+                view.setUint32(16, 16, true);
+                view.setUint16(20, 1, true);
+                view.setUint16(22, 1, true);
+                view.setUint32(24, sampleRate, true);
+                view.setUint32(28, sampleRate * 2, true);
+                view.setUint16(32, 2, true);
+                view.setUint16(34, 16, true);
+                writeString(36, 'data');
+                view.setUint32(40, bytes.length, true);
+                new Uint8Array(buffer, 44).set(bytes);
+                return URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }));
+            } catch (err) {
+                console.error(err);
+                return null;
+            }
+        };
+
+        const Icons = {
+            Rocket: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09zM12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2zM9 12H4s.55-3.03 2-5c1.62-2.2 5-3 5-3M12 15v5s3.03-.55 5-2c2.2-1.62 3-5 3-5"/></svg>,
+            Speaker: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 0 1 0 7.07"/></svg>,
+            Brain: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 4.44-1.48zM14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-4.44-1.48z"/></svg>,
+            Trophy: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg>,
+            Gamepad: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect width="20" height="12" x="2" y="6" rx="2"/><path d="M6 12h4M8 10v4M15 13h.01M18 11h.01"/></svg>
+        };
+
+        const App = () => {
+            const [user, setUser] = React.useState(null);
+            const [activeTab, setActiveTab] = React.useState('learn');
+            const [status, setStatus] = React.useState('Ready');
+            const [score, setScore] = React.useState(0);
+            const [leaderboard, setLeaderboard] = React.useState([]);
+
+            // Quiz States
+            const [quizIndex, setQuizIndex] = React.useState(0);
+            const [quizStatus, setQuizStatus] = React.useState('asking'); // asking, correct, wrong, completed
+            
+            // Game States
+            const [gameIndex, setGameIndex] = React.useState(0);
+            const [gameInput, setGameInput] = React.useState('');
+            const [gameStatus, setGameStatus] = React.useState('searching'); // searching, found, error, completed
+
+            const vocabulary = [
+                { id: 'v1', word: 'artist', zh: '藝術家', color: 'macaron-pink', emoji: '🎨' },
+                { id: 'v2', word: 'basketball player', zh: '籃球員', color: 'macaron-blue', emoji: '🏀' },
+                { id: 'v3', word: 'dentist', zh: '牙醫', color: 'macaron-yellow', emoji: '🦷' },
+                { id: 'v4', word: 'bus driver', zh: '公車司機', color: 'macaron-purple', emoji: '🚌' },
+                { id: 'v5', word: 'farmer', zh: '農夫', color: 'macaron-green', emoji: '👩‍🌾' },
+                { id: 'v6', word: 'police officer', zh: '警察', color: 'macaron-pink', emoji: '👮' },
+                { id: 'v7', word: 'singer', zh: '歌手', color: 'macaron-blue', emoji: '🎤' },
+                { id: 'v8', word: 'writer', zh: '作家', color: 'macaron-yellow', emoji: '✍️' },
+                { id: 'v9', word: 'be', zh: '成為', color: 'macaron-purple', emoji: '🚀' }
+            ];
+
+            const quizData = [
+                { q: "Do you want to be a writer?", options: ["Yes, I do.", "Yes, I am."], correct: 0 },
+                { q: "What do you want to be?", options: ["I want to a farmer.", "I want to be a farmer."], correct: 1 },
+                { q: "Do you want to be a singer?", options: ["No, I don't.", "No, I am."], correct: 0 },
+                { q: "I want to ___ a dentist.", options: ["is", "be"], correct: 1 },
+                { q: "Does he want to be an artist?", options: ["Yes, he does.", "Yes, he do."], correct: 0 },
+                { q: "What ___ you want to be?", options: ["do", "does"], correct: 0 }
+            ];
+
+            const gameData = [
+                { hint: "D E N _ _ S T", answer: "dentist", emoji: "🦷" },
+                { hint: "A R _ _ S T", answer: "artist", emoji: "🎨" },
+                { hint: "S _ N G _ R", answer: "singer", emoji: "🎤" },
+                { hint: "W R _ T _ R", answer: "writer", emoji: "✍️" },
+                { hint: "F A R _ _ R", answer: "farmer", emoji: "👨‍🌾" },
+                { hint: "B _ S _ _ T B A L L", answer: "basketball", emoji: "🏀" }
+            ];
+
+            React.useEffect(() => {
+                const initAuth = async () => {
+                    try {
+                        const res = await signInAnonymously(auth);
+                        setUser(res.user);
+                    } catch (err) {
+                        setStatus('Connection Failed 🛰️');
+                    }
+                };
+                initAuth();
+            }, []);
+
+            React.useEffect(() => {
+                if (!user) return;
+                const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'ranking'), limit(10));
+                const unsubscribe = onSnapshot(q, (snap) => {
+                    const data = snap.docs.map(doc => doc.data()).sort((a,b) => b.score - a.score);
+                    setLeaderboard(data);
+                }, (err) => console.error(err));
+                return () => unsubscribe();
+            }, [user]);
+
+            const speak = async (text) => {
+                if (!user) return;
+                const safeId = btoa(unescape(encodeURIComponent(text))).replace(/[/+=]/g, '_');
+                const cacheRef = doc(db, 'artifacts', appId, 'public', 'data', 'tts_cache', safeId);
+                try {
+                    setStatus('📡 Checking Cache...');
+                    const snap = await getDoc(cacheRef);
+                    let audioData;
+                    if (snap.exists()) {
+                        setStatus('🚀 Playing (Cached)');
+                        audioData = snap.data().base64;
+                    } else {
+                        setStatus('✨ Generating Space Voice...');
+                        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                contents: [{ parts: [{ text: `Say clearly: ${text}` }] }], 
+                                generationConfig: { 
+                                    responseModalities: ["AUDIO"],
+                                    speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } }
+                                },
+                                model: "gemini-2.5-flash-preview-tts"
+                            })
+                        });
+                        const result = await response.json();
+                        audioData = result.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+                        if (!audioData) throw new Error("TTS Failed");
+                        setStatus('💾 Saving to Base...');
+                        await setDoc(cacheRef, { base64: audioData, text, createdAt: serverTimestamp() });
+                    }
+                    const url = pcmToWav(audioData);
+                    if (url) {
+                        const audio = new Audio(url);
+                        audio.onended = () => setStatus('Ready');
+                        await audio.play();
+                    }
+                } catch (err) {
+                    console.error(err);
+                    setStatus('Error 🛸');
+                    setTimeout(() => setStatus('Ready'), 2000);
+                }
+            };
+
+            const handleQuizAnswer = (idx) => {
+                if (quizStatus !== 'asking') return;
+                const isCorrect = idx === quizData[quizIndex].correct;
+                if (isCorrect) {
+                    setScore(prev => prev + 20);
+                    setQuizStatus('correct');
+                    setTimeout(() => {
+                        if (quizIndex < quizData.length - 1) {
+                            setQuizIndex(prev => prev + 1);
+                            setQuizStatus('asking');
+                        } else {
+                            setQuizStatus('completed');
+                        }
+                    }, 1500);
+                } else {
+                    setQuizStatus('wrong');
+                    setTimeout(() => setQuizStatus('asking'), 1500);
+                }
+            };
+
+            const handleGameSubmit = (e) => {
+                if (e) e.preventDefault();
+                if (gameStatus !== 'searching') return;
+                if (gameInput.toLowerCase().trim() === gameData[gameIndex].answer) {
+                    setScore(prev => prev + 50);
+                    setGameStatus('found');
+                    setTimeout(() => {
+                        if (gameIndex < gameData.length - 1) {
+                            setGameIndex(prev => prev + 1);
+                            setGameInput('');
+                            setGameStatus('searching');
+                        } else {
+                            setGameStatus('completed');
+                        }
+                    }, 2000);
+                } else {
+                    setGameStatus('error');
+                    setTimeout(() => setGameStatus('searching'), 1000);
+                }
+            };
+
+            const submitScore = async () => {
+                if (!user || score === 0) return;
+                try {
+                    setStatus('📡 Transmitting...');
+                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'ranking'), {
+                        uid: user.uid,
+                        name: `Explorer_${user.uid.slice(0, 4)}`,
+                        score: score,
+                        timestamp: serverTimestamp()
+                    });
+                    setScore(0);
+                    setStatus('Success! 🌠');
+                } catch (e) {
+                    setStatus('Failed 🛰️');
+                }
+            };
+
+            return (
+                <div className="flex flex-col min-h-screen">
+                    {/* Header */}
+                    <header className="star-bg p-6 text-white shadow-2xl relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-10 opacity-10 floating"><Icons.Rocket /></div>
+                        <div className="max-w-6xl mx-auto flex justify-between items-end relative z-10">
+                            <div>
+                                <h1 className="text-4xl font-black italic tracking-tighter uppercase">Space Career Explorer</h1>
+                                <p className="text-blue-200 mt-1">Tr. Mimi's Galactic Classroom • Mission Control</p>
+                            </div>
+                            <div className="bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-3xl flex flex-col items-center min-w-[120px]">
+                                <span className="text-xs uppercase font-bold text-yellow-400">Star Points</span>
+                                <span className="text-3xl font-black tracking-widest">{score}</span>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Status Bar */}
+                    <div className="bg-indigo-900/5 border-b border-indigo-100 px-6 py-2 flex justify-between items-center text-[10px] font-bold text-indigo-400 uppercase tracking-widest">
+                        <div className="flex items-center gap-2">
+                            <div className={`w-2 h-2 rounded-full ${user ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}></div>
+                            Status: <span className={status.includes('...') || status.includes('ing') ? 'loading-pulse text-indigo-600' : ''}>{status}</span>
+                        </div>
+                        <div>User Auth: {user ? 'Online' : 'Linking...'}</div>
+                    </div>
+
+                    {/* Navigation */}
+                    <nav className="max-w-6xl mx-auto w-full px-6 mt-8 flex gap-3 overflow-x-auto hide-scrollbar">
+                        {[
+                            { id: 'learn', label: 'Explore', icon: <Icons.Rocket /> },
+                            { id: 'quiz', label: 'Academy', icon: <Icons.Brain /> },
+                            { id: 'game', label: 'Mission', icon: <Icons.Gamepad /> },
+                            { id: 'rank', label: 'Leaderboard', icon: <Icons.Trophy /> }
+                        ].map(tab => (
+                            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                                className={`flex items-center gap-3 px-8 py-4 rounded-full font-black transition-all ${activeTab === tab.id ? 'bg-indigo-600 text-white shadow-xl scale-105' : 'bg-white text-indigo-400 hover:bg-indigo-50 border border-indigo-100'}`}
+                            >
+                                {tab.icon} {tab.label}
+                            </button>
+                        ))}
+                    </nav>
+
+                    <main className="flex-1 max-w-6xl mx-auto w-full p-6">
+                        {/* Explore Tab */}
+                        {activeTab === 'learn' && (
+                            <div className="fade-in">
+                                <h2 className="text-2xl font-black text-indigo-900 mb-6 flex items-center gap-3">
+                                    <span className="p-2 bg-indigo-100 rounded-xl"><Icons.Rocket /></span> Vocabulary Discovery
+                                </h2>
+                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
+                                    {vocabulary.map(item => (
+                                        <div key={item.id} onClick={() => speak(item.word)}
+                                            className={`${item.color} space-card p-8 rounded-[2.5rem] shadow-sm flex flex-col items-center cursor-pointer relative group`}
+                                        >
+                                            <div className="absolute top-4 right-4 text-white/50 group-hover:text-indigo-600 transition"><Icons.Speaker /></div>
+                                            <div className="text-6xl mb-4 group-hover:rotate-12 transition-transform">{item.emoji}</div>
+                                            <span className="text-xl font-black text-gray-800 text-center">{item.word}</span>
+                                            <span className="text-sm text-gray-500 font-bold uppercase tracking-widest mt-1">{item.zh}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="mt-12 grid md:grid-cols-2 gap-8">
+                                    <div className="bg-white p-8 rounded-[3rem] shadow-xl border-4 border-indigo-50">
+                                        <div className="bg-indigo-600 text-white w-fit px-4 py-1 rounded-full text-[10px] font-black mb-4">DIALOGUE A</div>
+                                        <h3 className="text-2xl font-black text-indigo-900 mb-6 italic">"What do you want to be?"</h3>
+                                        <button onClick={() => speak("I want to be a police officer.")} className="w-full text-left macaron-pink p-5 rounded-2xl flex justify-between items-center group hover:brightness-95 transition">
+                                            <p className="font-bold text-gray-800">I want to be a <span className="text-indigo-600 underline">police officer</span>.</p><Icons.Speaker />
+                                        </button>
+                                    </div>
+                                    <div className="bg-white p-8 rounded-[3rem] shadow-xl border-4 border-indigo-50">
+                                        <div className="bg-pink-500 text-white w-fit px-4 py-1 rounded-full text-[10px] font-black mb-4">DIALOGUE B</div>
+                                        <h3 className="text-2xl font-black text-indigo-900 mb-6 italic">"Do you want to be a writer?"</h3>
+                                        <button onClick={() => speak("Yes, I do.")} className="w-full text-left macaron-green p-5 rounded-2xl flex justify-between items-center group hover:brightness-95 transition mb-3">
+                                            <p className="font-bold text-gray-800">Yes, I do.</p><Icons.Speaker />
+                                        </button>
+                                        <button onClick={() => speak("No, I don't. I want to be a basketball player.")} className="w-full text-left macaron-yellow p-5 rounded-2xl flex justify-between items-center group hover:brightness-95 transition">
+                                            <p className="font-bold text-gray-800">No, I don't. I want to be a <span className="text-indigo-600 underline">basketball player</span>.</p><Icons.Speaker />
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Academy Tab */}
+                        {activeTab === 'quiz' && (
+                            <div className="max-w-2xl mx-auto text-center py-10 fade-in">
+                                {quizStatus === 'completed' ? (
+                                    <div className="bg-white p-12 rounded-[5rem] shadow-2xl border-t-[15px] border-green-400">
+                                        <div className="text-9xl mb-8 floating">🎓</div>
+                                        <h2 className="text-4xl font-black text-indigo-900 mb-4">Academy Graduated!</h2>
+                                        <p className="text-gray-600 text-xl mb-8">You've mastered the career orbits.</p>
+                                        <button onClick={() => {setQuizIndex(0); setQuizStatus('asking');}} className="bg-indigo-600 text-white px-10 py-4 rounded-full font-black text-xl hover:scale-105 transition shadow-xl">RETAKE EXAM</button>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="text-8xl mb-6">🔭</div>
+                                        <h2 className="text-3xl font-black text-indigo-900 mb-2">Space Academy Quiz</h2>
+                                        <p className="text-gray-500 mb-6 font-bold uppercase tracking-widest">Question {quizIndex + 1} of {quizData.length}</p>
+                                        <div className="bg-white p-10 rounded-[4rem] shadow-2xl border-b-[15px] border-indigo-100">
+                                            <p className="text-2xl font-bold mb-10 italic">"{quizData[quizIndex].q}"</p>
+                                            <div className="grid gap-6">
+                                                {quizData[quizIndex].options.map((opt, i) => (
+                                                    <button key={i} onClick={() => handleQuizAnswer(i)} disabled={quizStatus !== 'asking'}
+                                                        className={`w-full py-6 rounded-3xl font-black text-xl transition-all shadow-md ${quizStatus === 'correct' && i === quizData[quizIndex].correct ? 'bg-green-500 text-white scale-105' : quizStatus === 'wrong' && i !== quizData[quizIndex].correct ? 'bg-red-500 text-white animate-shake' : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'}`}
+                                                    >
+                                                        {opt}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Mission Tab */}
+                        {activeTab === 'game' && (
+                            <div className="text-center py-10 fade-in">
+                                {gameStatus === 'completed' ? (
+                                    <div className="bg-indigo-900 p-20 rounded-[6rem] text-white shadow-2xl border-t-[15px] border-indigo-800">
+                                        <div className="text-9xl mb-10 floating">🌌</div>
+                                        <h2 className="text-5xl font-black mb-6">Mission Accomplished!</h2>
+                                        <p className="text-indigo-200 text-2xl mb-12">All space supplies have been delivered.</p>
+                                        <button onClick={() => {setGameIndex(0); setGameStatus('searching');}} className="bg-yellow-400 text-indigo-900 px-12 py-5 rounded-full font-black text-2xl hover:scale-105 transition shadow-2xl">RESTART MISSION</button>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className={`floating text-9xl mb-10 transition-all duration-700 ${gameStatus === 'found' ? 'scale-125 rotate-[360deg]' : ''}`}>
+                                            {gameStatus === 'found' ? '🏅' : gameData[gameIndex].emoji}
+                                        </div>
+                                        <h2 className="text-3xl font-black text-indigo-900 mb-2 uppercase tracking-widest">Level {gameIndex + 1} of {gameData.length}</h2>
+                                        <p className="text-gray-500 mb-10">Identify the career to unlock the next sector!</p>
+                                        <div className="bg-indigo-900 p-16 rounded-[6rem] text-white shadow-2xl border-t-[15px] border-indigo-800">
+                                            <div className="text-6xl font-mono tracking-[0.4em] mb-12 text-yellow-300 drop-shadow-lg uppercase">
+                                                {gameStatus === 'found' ? gameData[gameIndex].answer.split('').join(' ') : gameData[gameIndex].hint}
+                                            </div>
+                                            <form onSubmit={handleGameSubmit} className="max-w-md mx-auto">
+                                                <input type="text" value={gameInput} onChange={(e) => setGameInput(e.target.value)}
+                                                    placeholder="Enter Code..." disabled={gameStatus === 'found'}
+                                                    className="w-full bg-white/10 border-4 border-white/20 rounded-3xl px-8 py-5 text-center text-3xl font-bold mb-8 focus:outline-none focus:border-yellow-400 transition"
+                                                />
+                                                <button type="submit" disabled={gameStatus === 'found' || !gameInput.trim()}
+                                                    className={`w-full py-6 rounded-3xl font-black text-2xl transition-all shadow-xl ${gameStatus === 'found' ? 'bg-green-500' : 'bg-yellow-400 text-indigo-900 hover:scale-105'}`}
+                                                >
+                                                    {gameStatus === 'found' ? 'CARGO UNLOCKED!' : 'DECODE SIGNAL'}
+                                                </button>
+                                            </form>
+                                            {gameStatus === 'error' && <p className="mt-6 text-red-400 font-black animate-shake uppercase tracking-widest">Wrong Signal! Retrying...</p>}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Leaderboard Tab */}
+                        {activeTab === 'rank' && (
+                            <div className="max-w-xl mx-auto fade-in">
+                                <div className="bg-white rounded-[4rem] shadow-2xl overflow-hidden border-8 border-indigo-50">
+                                    <div className="bg-indigo-600 p-10 text-white text-center">
+                                        <h2 className="text-4xl font-black tracking-widest uppercase mb-2">Star Fleet Rank</h2>
+                                        <p className="text-indigo-200 font-bold">Top 10 Active Astronauts</p>
+                                    </div>
+                                    <div className="p-8">
+                                        <div className="space-y-4">
+                                            {leaderboard.length > 0 ? leaderboard.map((item, idx) => (
+                                                <div key={idx} className={`flex justify-between items-center p-6 rounded-3xl transition-all hover:scale-[1.02] ${idx === 0 ? 'bg-yellow-50 border-4 border-yellow-200' : 'bg-gray-50'}`}>
+                                                    <div className="flex items-center gap-6">
+                                                        <span className={`w-12 h-12 rounded-full flex items-center justify-center font-black text-xl ${idx === 0 ? 'bg-yellow-400 text-white' : 'bg-indigo-100 text-indigo-600'}`}>{idx + 1}</span>
+                                                        <span className="font-black text-gray-700 text-lg">{item.name}</span>
+                                                    </div>
+                                                    <span className="font-black text-indigo-600 text-2xl tracking-tighter">{item.score} <span className="text-[10px] uppercase opacity-50">stars</span></span>
+                                                </div>
+                                            )) : <div className="text-center py-20 text-indigo-300 font-bold italic animate-pulse">Scanning the Galaxy...</div>}
+                                        </div>
+                                        <button onClick={submitScore} disabled={score === 0}
+                                            className={`w-full mt-10 py-6 rounded-[2.5rem] font-black text-xl transition-all shadow-lg ${score > 0 ? 'bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+                                        >
+                                            {score > 0 ? `UPLOAD MY ${score} STARS` : 'EARN STARS TO RANK UP'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </main>
+
+                    <footer className="p-12 text-center">
+                        <p className="text-indigo-300 text-[10px] font-black uppercase tracking-[0.5em] opacity-60">
+                            Digital Laboratory of Tr. Mimi • Space Operations v3.0
+                        </p>
+                    </footer>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
