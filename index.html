@@ -1,370 +1,566 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Magic Phonics World - Enterprise Edition</title>
-    <!-- React & ReactDOM CDN -->
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <!-- Babel for JSX transpilation -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
-        body { font-family: 'Noto Sans TC', sans-serif; }
-        .animate-bounce-slow { animation: bounce 3s infinite; }
-        @keyframes bounce { 0%, 100% { transform: translateY(-5%); } 50% { transform: translateY(0); } }
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #10b981; border-radius: 10px; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>英語冒險王國 English Adventure Kingdom</title>
+  <style>
+    /* ===== CSS 變數：馬卡龍色系 ===== */
+    :root {
+      --pink:     #FFB3C6;
+      --pink-dark:#FF8FAD;
+      --lavender: #C9B8F0;
+      --lavender-dark:#A898E0;
+      --mint:     #B5EAD7;
+      --mint-dark:#82D4B4;
+      --yellow:   #FFF0B3;
+      --yellow-dark:#FFD966;
+      --peach:    #FFD7BE;
+      --peach-dark:#FFB88C;
+      --sky:      #BAD7F8;
+      --sky-dark: #7EB8F2;
+      --cream:    #FFF9F0;
+      --white:    #FFFFFF;
+      --text-dark:#4A3728;
+      --text-mid: #7A6050;
+      --shadow:   rgba(100, 70, 50, 0.15);
+      --radius:   20px;
+      --radius-sm:12px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+      background: var(--cream);
+      color: var(--text-dark);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ===== 背景浮動氣泡 ===== */
+    .bg-bubbles { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+    .bubble { position: absolute; border-radius: 50%; opacity: 0.18; animation: floatUp linear infinite; }
+    .bubble:nth-child(1) { width:80px;  height:80px;  left:5%;  background:var(--pink);     animation-duration:18s; animation-delay:0s;   bottom:-100px; }
+    .bubble:nth-child(2) { width:50px;  height:50px;  left:15%; background:var(--lavender); animation-duration:22s; animation-delay:3s;   bottom:-100px; }
+    .bubble:nth-child(3) { width:120px; height:120px; left:30%; background:var(--mint);     animation-duration:16s; animation-delay:6s;   bottom:-100px; }
+    .bubble:nth-child(4) { width:60px;  height:60px;  left:50%; background:var(--yellow);   animation-duration:20s; animation-delay:1s;   bottom:-100px; }
+    .bubble:nth-child(5) { width:90px;  height:90px;  left:70%; background:var(--peach);    animation-duration:25s; animation-delay:9s;   bottom:-100px; }
+    .bubble:nth-child(6) { width:40px;  height:40px;  left:85%; background:var(--sky);      animation-duration:19s; animation-delay:4s;   bottom:-100px; }
+    .bubble:nth-child(7) { width:70px;  height:70px;  left:92%; background:var(--pink);     animation-duration:23s; animation-delay:12s;  bottom:-100px; }
+
+    @keyframes floatUp {
+      0%   { transform: translateY(0) scale(1);       opacity: 0.18; }
+      50%  { transform: translateY(-50vh) scale(1.1); opacity: 0.12; }
+      100% { transform: translateY(-110vh) scale(0.9); opacity: 0; }
+    }
+
+    /* ===== 頁首 ===== */
+    header {
+      position: relative; z-index: 10;
+      background: linear-gradient(135deg, var(--sky) 0%, var(--lavender) 50%, var(--pink) 100%);
+      padding: 2rem 1.5rem 2.5rem;
+      text-align: center; overflow: hidden;
+      box-shadow: 0 4px 20px var(--shadow);
+    }
+    .header-stars { position: absolute; inset: 0; pointer-events: none; }
+    .star { position: absolute; font-size: 1.4rem; animation: twinkle ease-in-out infinite; }
+    .star:nth-child(1) { top:15%; left:5%;  animation-duration:2.1s; animation-delay:0s; }
+    .star:nth-child(2) { top:30%; left:12%; animation-duration:1.8s; animation-delay:0.5s; }
+    .star:nth-child(3) { top:10%; left:80%; animation-duration:2.4s; animation-delay:1s; }
+    .star:nth-child(4) { top:50%; left:90%; animation-duration:1.6s; animation-delay:0.3s; }
+    .star:nth-child(5) { top:70%; left:8%;  animation-duration:2.2s; animation-delay:1.5s; }
+    .star:nth-child(6) { top:80%; left:75%; animation-duration:1.9s; animation-delay:0.8s; }
+    .star:nth-child(7) { top:20%; left:50%; animation-duration:2.6s; animation-delay:0.2s; }
+    .star:nth-child(8) { top:60%; left:55%; animation-duration:1.7s; animation-delay:1.2s; }
+
+    @keyframes twinkle {
+      0%, 100% { opacity: 1;   transform: scale(1)   rotate(0deg); }
+      50%       { opacity: 0.3; transform: scale(0.6) rotate(20deg); }
+    }
+
+    .header-mascot {
+      font-size: 4rem; display: block;
+      animation: mascotFloat 3s ease-in-out infinite;
+      filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15));
+    }
+    @keyframes mascotFloat {
+      0%, 100% { transform: translateY(0px) rotate(-3deg); }
+      50%       { transform: translateY(-10px) rotate(3deg); }
+    }
+    .header-title {
+      font-size: clamp(1.6rem, 5vw, 2.8rem); font-weight: 900;
+      color: var(--white);
+      text-shadow: 0 3px 10px rgba(100,60,40,0.3), 0 1px 0 rgba(255,255,255,0.5);
+      letter-spacing: 0.05em; margin-top: 0.5rem;
+    }
+    .header-subtitle {
+      font-size: clamp(0.85rem, 2.5vw, 1.1rem);
+      color: rgba(255,255,255,0.9); margin-top: 0.4rem;
+      letter-spacing: 0.08em; text-shadow: 0 1px 4px rgba(100,60,40,0.2);
+    }
+    .header-badge {
+      display: inline-block;
+      background: rgba(255,255,255,0.35);
+      border: 2px solid rgba(255,255,255,0.6);
+      border-radius: 50px; padding: 0.25rem 1rem;
+      font-size: 0.8rem; color: var(--white); margin-top: 0.8rem;
+      backdrop-filter: blur(4px); letter-spacing: 0.05em;
+    }
+
+    /* ===== 麵包屑 ===== */
+    .breadcrumb {
+      display: flex; align-items: center; gap: 0.4rem;
+      font-size: 0.82rem; color: var(--text-mid);
+      margin-bottom: 1.4rem; flex-wrap: wrap;
+    }
+    .breadcrumb .crumb {
+      cursor: pointer; color: var(--lavender-dark); font-weight: 700;
+      text-decoration: underline; text-underline-offset: 2px;
+    }
+    .breadcrumb .crumb:hover { color: var(--pink-dark); }
+    .breadcrumb .sep { color: var(--peach-dark); }
+    .breadcrumb .current { color: var(--text-dark); font-weight: 700; }
+
+    /* ===== 主體容器 ===== */
+    main { position: relative; z-index: 5; max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem 3rem; }
+
+    /* ===== 畫面切換 ===== */
+    .view { display: none; animation: fadeIn 0.35s ease; }
+    .view.active { display: block; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ===== 區塊標題 ===== */
+    .section-label { text-align: center; margin-bottom: 1.8rem; }
+    .section-label h2 {
+      font-size: clamp(1.2rem, 3.5vw, 1.6rem); font-weight: 800;
+      color: var(--text-dark);
+      display: inline-flex; align-items: center; gap: 0.5rem;
+    }
+    .section-label p { font-size: 0.88rem; color: var(--text-mid); margin-top: 0.35rem; }
+
+    /* ===== 返回按鈕 ===== */
+    .back-btn {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      background: var(--white); border: 2.5px solid var(--peach-dark);
+      border-radius: 50px; padding: 0.6rem 1.4rem;
+      font-size: 0.95rem; font-weight: 700; color: var(--text-dark);
+      cursor: pointer; transition: all 0.2s;
+      box-shadow: 0 3px 10px var(--shadow); margin-bottom: 1.8rem;
+    }
+    .back-btn:hover { background: var(--peach); transform: translateX(-4px); box-shadow: 0 5px 16px var(--shadow); }
+    .back-btn:active { transform: scale(0.96); }
+
+    /* ===== 年級網格（2欄） ===== */
+    .grade-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.4rem;
+      max-width: 560px;
+      margin: 0 auto;
+    }
+
+    .grade-card {
+      background: var(--white); border-radius: var(--radius);
+      padding: 2.5rem 1.5rem; text-align: center; cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      box-shadow: 0 4px 16px var(--shadow);
+      border: 3px solid transparent;
+      position: relative; overflow: hidden;
+      display: block;
+    }
+    .grade-card::before {
+      content: ''; position: absolute; inset: 0;
+      opacity: 0.18; transition: opacity 0.2s;
+    }
+    .grade-card:hover { transform: translateY(-6px) scale(1.02); box-shadow: 0 10px 32px var(--shadow); }
+    .grade-card:active { transform: scale(0.97); }
+
+    .grade-card[data-grade="4"] { border-color: var(--lavender); }
+    .grade-card[data-grade="4"]::before { background: var(--lavender); }
+    .grade-card[data-grade="4"]:hover { box-shadow: 0 10px 32px rgba(168,152,224,0.35); }
+
+    .grade-card[data-grade="6"] { border-color: var(--yellow); }
+    .grade-card[data-grade="6"]::before { background: var(--yellow); }
+    .grade-card[data-grade="6"]:hover { box-shadow: 0 10px 32px rgba(255,217,102,0.4); }
+
+    .grade-icon {
+      font-size: 4rem; display: block; margin-bottom: 0.8rem;
+      animation: iconBounce 2.5s ease-in-out infinite;
+      position: relative; z-index: 1;
+    }
+    .grade-card:nth-child(2) .grade-icon { animation-delay: 0.4s; }
+
+    @keyframes iconBounce {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(-6px); }
+    }
+    .grade-cn { font-size: 1.6rem; font-weight: 800; color: var(--text-dark); position: relative; z-index: 1; }
+    .grade-en { font-size: 0.9rem; color: var(--text-mid); font-weight: 600; margin-top: 0.2rem; position: relative; z-index: 1; }
+    .grade-desc { font-size: 0.78rem; color: var(--text-mid); margin-top: 0.5rem; position: relative; z-index: 1; }
+
+    .grade-ribbon {
+      position: absolute; top: 12px; right: -28px;
+      width: 100px; text-align: center;
+      font-size: 0.65rem; font-weight: 700; color: #fff; padding: 3px 0;
+      transform: rotate(30deg); letter-spacing: 0.05em;
+    }
+    .grade-card[data-grade="4"] .grade-ribbon { background: var(--lavender-dark); }
+    .grade-card[data-grade="6"] .grade-ribbon { background: var(--yellow-dark); color: #5a4a00; }
+
+    /* ===== 單元網格（2欄） ===== */
+    .unit-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.2rem;
+      max-width: 560px;
+      margin: 0 auto;
+    }
+
+    .unit-card {
+      background: var(--white); border-radius: var(--radius);
+      padding: 2rem 1.2rem; text-align: center; cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      box-shadow: 0 4px 16px var(--shadow);
+      border: 3px solid var(--peach);
+      position: relative; overflow: hidden;
+      display: block;
+    }
+    .unit-card::before {
+      content: ''; position: absolute; inset: 0;
+      background: var(--peach); opacity: 0.12; transition: opacity 0.2s;
+    }
+    .unit-card:hover { transform: translateY(-5px); box-shadow: 0 10px 28px rgba(255,184,140,0.35); border-color: var(--peach-dark); }
+    .unit-card:active { transform: scale(0.97); }
+
+    .unit-icon { font-size: 3rem; display: block; margin-bottom: 0.7rem; position: relative; z-index: 1; }
+    .unit-cn { font-size: 1.3rem; font-weight: 800; color: var(--text-dark); position: relative; z-index: 1; }
+    .unit-en { font-size: 0.82rem; color: var(--text-mid); font-weight: 600; margin-top: 0.2rem; position: relative; z-index: 1; }
+
+    /* 各年級單元牌色 */
+    .unit-card.grade-4 { border-color: var(--lavender); }
+    .unit-card.grade-4::before { background: var(--lavender); }
+    .unit-card.grade-4:hover { border-color: var(--lavender-dark); box-shadow: 0 10px 28px rgba(168,152,224,0.3); }
+
+    .unit-card.grade-6 { border-color: var(--yellow); }
+    .unit-card.grade-6::before { background: var(--yellow); }
+    .unit-card.grade-6:hover { border-color: var(--yellow-dark); box-shadow: 0 10px 28px rgba(255,209,102,0.3); }
+
+    /* ===== 活動網格（2×2） ===== */
+    .activity-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.2rem;
+      max-width: 560px;
+      margin: 0 auto;
+    }
+
+    .activity-card {
+      background: var(--white); border-radius: var(--radius);
+      padding: 2rem 1.2rem; text-align: center;
+      text-decoration: none; color: var(--text-dark);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      box-shadow: 0 4px 16px var(--shadow);
+      border: 3px solid transparent;
+      position: relative; overflow: hidden;
+      display: block;
+    }
+    .activity-card::before {
+      content: ''; position: absolute; inset: 0;
+      opacity: 0.18; transition: opacity 0.2s;
+    }
+    .activity-card:hover { transform: translateY(-5px); box-shadow: 0 10px 28px var(--shadow); }
+    .activity-card:active { transform: scale(0.97); }
+
+    /* 四種活動各自的顏色 */
+    .activity-card[data-type="vocab"]    { border-color: var(--pink);     }
+    .activity-card[data-type="vocab"]::before    { background: var(--pink); }
+    .activity-card[data-type="vocab"]:hover    { box-shadow: 0 10px 28px rgba(255,139,173,0.3); }
+
+    .activity-card[data-type="basic"]   { border-color: var(--mint);     }
+    .activity-card[data-type="basic"]::before    { background: var(--mint); }
+    .activity-card[data-type="basic"]:hover    { box-shadow: 0 10px 28px rgba(130,212,180,0.3); }
+
+    .activity-card[data-type="advanced"]{ border-color: var(--lavender); }
+    .activity-card[data-type="advanced"]::before { background: var(--lavender); }
+    .activity-card[data-type="advanced"]:hover { box-shadow: 0 10px 28px rgba(168,152,224,0.3); }
+
+    .activity-card[data-type="listen"]  { border-color: var(--sky);      }
+    .activity-card[data-type="listen"]::before   { background: var(--sky); }
+    .activity-card[data-type="listen"]:hover   { box-shadow: 0 10px 28px rgba(126,184,242,0.3); }
+
+    /* 「即將開放」遮罩 */
+    .activity-card.coming-soon { opacity: 0.72; pointer-events: none; }
+    .activity-card.coming-soon::after {
+      content: '🔜 即將開放';
+      position: absolute; top: 8px; right: 8px;
+      background: rgba(255,255,255,0.88);
+      border-radius: 20px; padding: 2px 9px;
+      font-size: 0.6rem; font-weight: 700; color: var(--text-mid); z-index: 3;
+      white-space: nowrap;
+    }
+
+    .activity-icon { font-size: 2.8rem; display: block; margin-bottom: 0.6rem; position: relative; z-index: 1; }
+    .activity-cn { font-size: 1.1rem; font-weight: 800; color: var(--text-dark); position: relative; z-index: 1; }
+    .activity-en { font-size: 0.75rem; color: var(--text-mid); margin-top: 0.2rem; position: relative; z-index: 1; }
+
+    /* ===== 頁首標題列（當前位置） ===== */
+    .view-header {
+      display: flex; align-items: center; gap: 0.8rem;
+      flex-wrap: wrap; margin-bottom: 1.6rem;
+    }
+    .view-tag {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      border-radius: 50px; padding: 0.35rem 1rem;
+      font-size: 0.88rem; font-weight: 700; color: var(--text-dark);
+    }
+
+    /* ===== 頁尾 ===== */
+    footer { position: relative; z-index: 5; text-align: center; padding: 1.5rem; font-size: 0.78rem; color: var(--text-mid); }
+    footer span { color: var(--pink-dark); }
+
+    /* ===== 響應式 ===== */
+    @media (max-width: 480px) {
+      .grade-grid, .unit-grid, .activity-grid { grid-template-columns: repeat(2, 1fr); gap: 0.8rem; }
+      .grade-card { padding: 1.8rem 1rem; }
+      .grade-icon { font-size: 3rem; }
+      .grade-cn   { font-size: 1.3rem; }
+    }
+  </style>
 </head>
-<body class="bg-yellow-50">
-    <div id="root"></div>
+<body>
 
-    <!-- Firebase SDK Implementation -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        
-        window.FB = { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, getFirestore, doc, getDoc, setDoc, collection };
-    </script>
+  <div class="bg-bubbles" aria-hidden="true">
+    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
+    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
+    <div class="bubble"></div>
+  </div>
 
-    <script type="text/babel">
-        const IconWrapper = ({ children, size = 24, className = "" }) => (
-            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{children}</svg>
-        );
-        const BookOpen = (p) => <IconWrapper {...p}><path d="M2 3h6a4 4 0 0 1 4 4v14a4 4 0 0 0-4-4H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a4 4 0 0 1 4-4h6z"/></IconWrapper>;
-        const Sparkles = (p) => <IconWrapper {...p}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></IconWrapper>;
-        const MessageSquare = (p) => <IconWrapper {...p}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></IconWrapper>;
-        const ChevronRight = (p) => <IconWrapper {...p}><path d="m9 18 6-6-6-6"/></IconWrapper>;
-        const ChevronLeft = (p) => <IconWrapper {...p}><path d="m15 18-6-6 6-6"/></IconWrapper>;
-        const Home = (p) => <IconWrapper {...p}><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></IconWrapper>;
-        const Volume2 = (p) => <IconWrapper {...p}><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></IconWrapper>;
-        const Loader2 = (p) => <IconWrapper {...p} className={`${p.className} animate-spin`}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></IconWrapper>;
-        const Star = (p) => <IconWrapper {...p}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></IconWrapper>;
-        const Heart = (p) => <IconWrapper {...p}><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></IconWrapper>;
+  <header>
+    <div class="header-stars" aria-hidden="true">
+      <span class="star">✨</span><span class="star">⭐</span>
+      <span class="star">✨</span><span class="star">🌟</span>
+      <span class="star">✨</span><span class="star">⭐</span>
+      <span class="star">✨</span><span class="star">🌟</span>
+    </div>
+    <span class="header-mascot" aria-hidden="true">🧙‍♀️</span>
+    <h1 class="header-title">英語冒險王國</h1>
+    <p class="header-subtitle">English Adventure Kingdom</p>
+    <span class="header-badge">⚔️ 選擇你的冒險 · Choose Your Quest ⚔️</span>
+  </header>
 
-        const { useState, useEffect, useRef } = React;
+  <main>
 
-        const App = () => {
-            const [currentPage, setCurrentPage] = useState('home');
-            const [activeGroup, setActiveGroup] = useState(null);
-            const [step, setStep] = useState(0);
-            const [isSpeaking, setIsSpeaking] = useState(null);
-            const [debugMsg, setDebugMsg] = useState("🚀 System: Initializing Phonics Engine...");
-            const [cacheStatus, setCacheStatus] = useState({});
-            const [user, setUser] = useState(null);
-            const [db, setDb] = useState(null);
+    <div id="view-grade" class="view active">
+      <div class="section-label">
+        <h2>🗂️ 選擇年級</h2>
+        <p>Select Your Grade · 點選卡片開始冒險！</p>
+      </div>
+      <div class="grade-grid">
 
-            // 在預覽模式下，金鑰會由環境自動注入，不需手動填寫。
-            // 部署至 GitHub Pages 時，若無金鑰則僅能播放已快取的音檔。
-            const apiKey = ""; 
+        <div class="grade-card" data-grade="4" onclick="showUnits(4)" role="button" tabindex="0">
+          <span class="grade-ribbon">QUEST</span>
+          <span class="grade-icon">🏰</span>
+          <div class="grade-cn">四年級</div>
+          <div class="grade-en">Grade 4</div>
+          <div class="grade-desc">進階單字 · 句型練習</div>
+        </div>
 
-            const appId = "phonics-magic-e-mimi-pro";
-            const firebaseConfig = {
-                apiKey: "AIzaSyBnjfbh1ow4j6gXBP9XeBQkCt_cs7Uv3ds",
-                authDomain: "education-b38d5.firebaseapp.com",
-                projectId: "education-b38d5",
-                storageBucket: "education-b38d5.firebasestorage.app",
-                messagingSenderId: "450320441540",
-                appId: "1:450320441540:web:888014b1380a473a142991",
-                measurementId: "G-70DQ70W0B8"
-            };
+        <div class="grade-card" data-grade="6" onclick="showUnits(6)" role="button" tabindex="0">
+          <span class="grade-ribbon">MASTER</span>
+          <span class="grade-icon">⚔️</span>
+          <div class="grade-cn">六年級</div>
+          <div class="grade-en">Grade 6</div>
+          <div class="grade-desc">綜合應用 · 挑戰關卡</div>
+        </div>
 
-            const phonicsData = {
-                short_e: {
-                    title: "Short e (/ɛ/)",
-                    rule: "短母音 e 發音像是 /ɛ/！嘴巴微微張開，嘴角向兩邊拉一點點，像在微笑。",
-                    ruleHint: "通常出現在兩個子音中間 (CVC)，像是 E-g-g 或是 B-e-d。",
-                    accentColor: "bg-emerald-400",
-                    textColor: "text-emerald-600",
-                    words: [
-                        { word: "Bed", trans: "床", icon: "🛏️" },
-                        { word: "Egg", trans: "雞蛋", icon: "🥚" },
-                        { word: "Pen", trans: "原子筆", icon: "🖊️" },
-                        { word: "Red", trans: "紅色", icon: "🔴" },
-                        { word: "Net", trans: "網子", icon: "🕸️" }
-                    ],
-                    comparisons: [
-                        { id: 'se1', pair: "Pet vs. Pete", sentence: "Pete has a small pet dog.", trans: "皮特有一隻小寵物狗。" },
-                        { id: 'se2', pair: "Them vs. Theme", sentence: "The theme park is for them.", trans: "那個主題樂園是給他們玩的。" },
-                        { id: 'se3', pair: "Met vs. Mete", sentence: "We met to mete out the candy.", trans: "我們見面是為了分配糖果。" }
-                    ]
-                },
-                long_e_e: {
-                    title: "Long e-e (/iː/)",
-                    rule: "長母音 e 發字母本身的音 /iː/！就像你在說 'Easy' 的開頭一樣。",
-                    ruleHint: "當字尾出現 Magic e，它會把前面的 e 變成長長的 /iː/ 喔！",
-                    accentColor: "bg-violet-400",
-                    textColor: "text-violet-600",
-                    words: [
-                        { word: "Pete", trans: "皮特(人名)", icon: "👦" },
-                        { word: "Eve", trans: "夏娃(人名)", icon: "👧" },
-                        { word: "These", trans: "這些", icon: "👈" },
-                        { word: "Gene", trans: "基因", icon: "🧬" },
-                        { word: "Theme", trans: "主題", icon: "🎨" }
-                    ],
-                    comparisons: [
-                        { id: 'le1', pair: "Pet vs. Pete", sentence: "Is that pet for Pete?", trans: "那隻寵物是給皮特的嗎？" },
-                        { id: 'le2', pair: "Them vs. These", sentence: "Give these toys to them.", trans: "把這些玩具給他們。" },
-                        { id: 'le3', pair: "Steve vs. Step", sentence: "Steve took a big step.", trans: "史蒂夫跨出了一大步。" }
-                    ]
-                }
-            };
+      </div>
+    </div>
 
-            useEffect(() => {
-                setDebugMsg("⌛ Waiting for Firebase SDK...");
-                const checkFB = setInterval(async () => {
-                    if (window.FB) {
-                        clearInterval(checkFB);
-                        try {
-                            const app = window.FB.initializeApp(firebaseConfig);
-                            const auth = window.FB.getAuth(app);
-                            const firestore = window.FB.getFirestore(app);
-                            await window.FB.signInAnonymously(auth);
-                            window.FB.onAuthStateChanged(auth, (currentUser) => {
-                                setUser(currentUser);
-                                setDb(firestore);
-                                setDebugMsg(`✅ Ready: Connected as ${currentUser?.uid.slice(0, 6)}...`);
-                            });
-                        } catch (err) {
-                            setDebugMsg(`❌ Firebase Error: ${err.message}`);
-                        }
-                    }
-                }, 500);
-                return () => clearInterval(checkFB);
-            }, []);
+    <div id="view-unit" class="view">
+      <div class="view-header">
+        <button class="back-btn" onclick="goBack('grade')">← 返回年級選擇</button>
+        <span id="unit-grade-tag" class="view-tag"></span>
+      </div>
+      <div class="breadcrumb">
+        <span class="crumb" onclick="goBack('grade')">首頁</span>
+        <span class="sep">›</span>
+        <span id="bc-grade" class="current"></span>
+      </div>
+      <div class="section-label">
+        <h2>📚 選擇單元</h2>
+        <p>Select Your Unit · 點選單元進入關卡！</p>
+      </div>
+      <div id="unit-grid" class="unit-grid"></div>
+    </div>
 
-            const generateSafeId = (text) => {
-                return btoa(unescape(encodeURIComponent(text))).replace(/[/+=]/g, '_');
-            };
+    <div id="view-activity" class="view">
+      <div class="view-header">
+        <button class="back-btn" onclick="goBack('unit')">← 返回單元選擇</button>
+        <span id="activity-unit-tag" class="view-tag"></span>
+      </div>
+      <div class="breadcrumb">
+        <span class="crumb" onclick="goBack('grade')">首頁</span>
+        <span class="sep">›</span>
+        <span id="bc-grade2" class="crumb" onclick="goBack('unit')"></span>
+        <span class="sep">›</span>
+        <span id="bc-unit" class="current"></span>
+      </div>
+      <div class="section-label">
+        <h2>🎯 選擇活動</h2>
+        <p>Select Your Activity · 開始你的學習！</p>
+      </div>
+      <div id="activity-grid" class="activity-grid"></div>
+    </div>
 
-            const pcmToWav = (pcmBase64, sampleRate = 24000) => {
-                const binaryString = window.atob(pcmBase64);
-                const bytes = new Uint8Array(binaryString.length);
-                for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
-                const wavBuffer = new ArrayBuffer(44 + bytes.length);
-                const wavView = new DataView(wavBuffer);
-                const writeString = (v, o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
-                writeString(wavView, 0, 'RIFF');
-                wavView.setUint32(4, 36 + bytes.length, true);
-                writeString(wavView, 8, 'WAVE');
-                writeString(wavView, 12, 'fmt ');
-                wavView.setUint32(16, 16, true);
-                wavView.setUint16(20, 1, true);
-                wavView.setUint16(22, 1, true);
-                wavView.setUint32(24, sampleRate, true);
-                wavView.setUint32(28, sampleRate * 2, true);
-                wavView.setUint16(32, 2, true);
-                wavView.setUint16(34, 16, true);
-                writeString(wavView, 36, 'data');
-                wavView.setUint32(40, bytes.length, true);
-                new Uint8Array(wavBuffer, 44).set(bytes);
-                return URL.createObjectURL(new Blob([wavBuffer], { type: 'audio/wav' }));
-            };
+  </main>
 
-            const handleSpeak = async (text, id) => {
-                if (!db || !user) {
-                    setDebugMsg("❌ Error: Firebase not ready.");
-                    return;
-                }
-                if (isSpeaking) return;
-                setIsSpeaking(id);
+  <footer>Made with <span>♥</span> for young English adventurers · 英語冒險王國</footer>
 
-                const safeId = generateSafeId(text);
-                const cacheRef = window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'audio_cache', safeId);
-                
-                try {
-                    const cacheDoc = await window.FB.getDoc(cacheRef);
-                    if (cacheDoc.exists()) {
-                        setDebugMsg("✅ Cache Found!");
-                        const audioData = cacheDoc.data().audioBase64;
-                        const audio = new Audio(pcmToWav(audioData));
-                        audio.onended = () => { setIsSpeaking(null); setCacheStatus(prev => ({...prev, [id]: 'cached'})); };
-                        audio.play();
-                    } else {
-                        // 在預覽模式下直接嘗試呼叫，環境會自動處理金鑰
-                        setDebugMsg("⌛ Generating new audio...");
-                        const hasChinese = /[\u4e00-\u9fa5]/.test(text);
-                        let speechText = text;
-                        const ipaMap = { '/ɛ/': 'short e sound', '/iː/': 'long e sound' };
-                        Object.keys(ipaMap).forEach(key => speechText = speechText.split(key).join(ipaMap[key]));
+  <script>
+    // ===== 資料結構 =====
+    const UNIT_ICONS = ['📖','🌟','🎯','🏆'];
+    const UNIT_NAMES = ['一','二','三','四'];
 
-                        const prompt = hasChinese 
-                            ? `請用親切標準的繁體中文（台灣口音）朗讀內容：${speechText}` 
-                            : `Say clearly in English: ${speechText}`;
+    function makeActivities(grade, unitIndex) {
+      const links = {
+        // 四年級單元一至四 (Grad4)
+        '4-0': { 
+          vocab: 'https://gianna17chen-arch.github.io/education/grad4/ch1/vocabulary', 
+          basic: 'https://gianna17chen-arch.github.io/education/grad4/ch1/grammar_basic', 
+          advanced: 'https://gianna17chen-arch.github.io/education/grad4/ch1/grammar_advanced', 
+          listen: 'https://gianna17chen-arch.github.io/education/grad4/ch1/listning' 
+        },
+        '4-1': { 
+          vocab: 'https://gianna17chen-arch.github.io/education/grad4/ch2/vocabulary', 
+          basic: 'https://gianna17chen-arch.github.io/education/grad4/ch2/grammar_basic', 
+          advanced: 'https://gianna17chen-arch.github.io/education/grad4/ch2/grammar_advanced', 
+          listen: 'https://gianna17chen-arch.github.io/education/grad4/ch2/listning' 
+        },
+        '4-2': { 
+          vocab: 'https://gianna17chen-arch.github.io/education/grad4/ch3/vocabulary', 
+          basic: 'https://gianna17chen-arch.github.io/education/grad4/ch3/grammar_basic', 
+          advanced: 'https://gianna17chen-arch.github.io/education/grad4/ch3/grammar_advanced', 
+          listen: 'https://gianna17chen-arch.github.io/education/grad4/ch3/listning' 
+        },
+        '4-3': { 
+          vocab: 'https://gianna17chen-arch.github.io/education/grad4/ch4/vocabulary', 
+          basic: 'https://gianna17chen-arch.github.io/education/grad4/ch4/grammar_basic', 
+          advanced: 'https://gianna17chen-arch.github.io/education/grad4/ch4/grammar_advanced', 
+          listen: 'https://gianna17chen-arch.github.io/education/grad4/ch4/listning' 
+        },
+        // 六年級單元一至四 (Grad6)
+        '6-0': { 
+          vocab: 'https://gianna17chen-arch.github.io/education/grad6/ch1/vocabulary', 
+          basic: 'https://gianna17chen-arch.github.io/education/grad6/ch1/grammar_basic', 
+          advanced: 'https://gianna17chen-arch.github.io/education/grad6/ch1/grammar_advanced', 
+          listen: 'https://gianna17chen-arch.github.io/education/grad6/ch1/listning' 
+        },
+        '6-1': { 
+          vocab: 'https://gianna17chen-arch.github.io/education/grad6/ch2/vocabulary', 
+          basic: 'https://gianna17chen-arch.github.io/education/grad6/ch2/grammar_basic', 
+          advanced: 'https://gianna17chen-arch.github.io/education/grad6/ch2/grammar_advanced', 
+          listen: 'https://gianna17chen-arch.github.io/education/grad6/ch2/listning' 
+        },
+        '6-2': { 
+          vocab: 'https://gianna17chen-arch.github.io/education/grad6/ch3/vocabulary', 
+          basic: 'https://gianna17chen-arch.github.io/education/grad6/ch3/grammar_basic', 
+          advanced: 'https://gianna17chen-arch.github.io/education/grad6/ch3/grammar_advanced', 
+          listen: 'https://gianna17chen-arch.github.io/education/grad6/ch3/listning' 
+        },
+        '6-3': { 
+          vocab: 'https://gianna17chen-arch.github.io/education/grad6/ch4/vocabulary', 
+          basic: 'https://gianna17chen-arch.github.io/education/grad6/ch4/grammar_basic', 
+          advanced: 'https://gianna17chen-arch.github.io/education/grad6/ch4/grammar_advanced', 
+          listen: 'https://gianna17chen-arch.github.io/education/grad6/ch4/listning' 
+        }
+      };
 
-                        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                contents: [{ parts: [{ text: prompt }] }],
-                                generationConfig: {
-                                    responseModalities: ["AUDIO"],
-                                    speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } }
-                                }
-                            })
-                        });
+      const key = `${grade}-${unitIndex}`;
+      const l = links[key] || {};
+      return [
+        { type: 'vocab',    icon: '🔤', cn: '單字',   en: 'Vocabulary',      href: l.vocab    || '#' },
+        { type: 'basic',    icon: '📐', cn: '基礎文法', en: 'Basic Grammar',   href: l.basic    || '#' },
+        { type: 'advanced', icon: '🧩', cn: '進階文法', en: 'Advanced Grammar', href: l.advanced || '#' },
+        { type: 'listen',   icon: '🎧', cn: '聽力朗讀', en: 'Listening',        href: l.listen   || '#' },
+      ];
+    }
 
-                        const result = await response.json();
-                        const pcmData = result.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    const gradeStyles = {
+      4: { bg: '#C9B8F0', label: '🏰 四年級', cls: 'grade-4' },
+      6: { bg: '#FFF0B3', label: '⚔️ 六年級', cls: 'grade-6' },
+    };
 
-                        if (pcmData) {
-                            setDebugMsg("💾 Saving to Cloud Cache...");
-                            await window.FB.setDoc(cacheRef, {
-                                audioBase64: pcmData,
-                                text: text,
-                                createdAt: new Date().toISOString()
-                            });
-                            const audio = new Audio(pcmToWav(pcmData));
-                            audio.onended = () => { setIsSpeaking(null); setCacheStatus(prev => ({...prev, [id]: 'cached'})); };
-                            audio.play();
-                        } else {
-                            // 若無 PCM 資料且也沒填金鑰，則顯示提示
-                            if (!apiKey) {
-                                setDebugMsg("⚠️ 無快取且環境金鑰失效：請在部署環境填入 API Key。");
-                            } else {
-                                throw new Error("API failed to return audio.");
-                            }
-                            setIsSpeaking(null);
-                        }
-                    }
-                } catch (err) {
-                    setDebugMsg(`❌ Error: ${err.message}`);
-                    setIsSpeaking(null);
-                }
-            };
+    let currentGrade = null;
+    let currentUnit  = null;
 
-            const nextStep = () => step < 2 ? setStep(step + 1) : setCurrentPage('home');
-            const prevStep = () => step > 0 ? setStep(step - 1) : setCurrentPage('home');
+    function showUnits(grade) {
+      currentGrade = grade;
+      const style = gradeStyles[grade];
+      const tag = document.getElementById('unit-grade-tag');
+      tag.textContent = style.label;
+      tag.style.background = style.bg;
+      document.getElementById('bc-grade').textContent = style.label;
 
-            const StatusBadge = ({ id }) => {
-                if (isSpeaking === id) return <span className="ml-2 text-sm animate-pulse text-cyan-500 font-bold">🔊 播放中...</span>;
-                if (cacheStatus[id] === 'cached') return <span className="ml-2 text-sm text-emerald-500 font-bold">✅ 已快取</span>;
-                return <span className="ml-2 text-sm text-slate-400 opacity-50 italic">⌛ 未快取</span>;
-            };
+      const grid = document.getElementById('unit-grid');
+      grid.innerHTML = UNIT_NAMES.map((name, i) => `
+        <div class="unit-card ${style.cls}" onclick="showActivities(${i})" role="button" tabindex="0">
+          <span class="unit-icon">${UNIT_ICONS[i]}</span>
+          <div class="unit-cn">單元${name}</div>
+          <div class="unit-en">Unit ${i + 1}</div>
+        </div>
+      `).join('');
+      switchView('view-unit');
+    }
 
-            const renderHome = () => (
-                <div className="flex flex-col items-center justify-center min-h-screen p-8 space-y-12">
-                    <div className="text-center space-y-6">
-                        <div className="flex justify-center gap-4 mb-2">
-                            <Heart className="text-pink-400 fill-pink-400 animate-pulse" size={48} />
-                            <Star className="text-yellow-400 fill-yellow-400 animate-bounce-slow" size={56} />
-                            <Heart className="text-pink-400 fill-pink-400 animate-pulse" size={48} />
-                        </div>
-                        <h1 className="text-5xl md:text-8xl font-black tracking-tight text-emerald-600 drop-shadow-md">Magic 'e' World</h1>
-                        <p className="text-xl md:text-3xl text-emerald-800/70 font-bold bg-white/60 py-2 px-8 rounded-full inline-block border-2 border-emerald-100 shadow-sm">
-                            Cloud Cache Edition - Pro Phonics
-                        </p>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 w-full max-w-4xl px-4">
-                        {Object.entries(phonicsData).map(([key, data]) => (
-                            <button key={key} onClick={() => { setActiveGroup(key); setStep(0); setCurrentPage('lesson'); }} className="group bg-white border-4 border-dashed border-emerald-200 hover:border-emerald-400 rounded-[3rem] p-8 md:p-12 transition-all duration-300 hover:scale-105 shadow-xl relative overflow-hidden">
-                                <div className={`absolute -right-4 -top-4 w-24 h-24 rounded-full ${data.accentColor} opacity-20`} />
-                                <div className="text-6xl md:text-8xl mb-6">{key === 'short_e' ? '🥚' : '👦'}</div>
-                                <div className={`text-3xl md:text-5xl font-black mb-2 ${data.textColor}`}>{data.title}</div>
-                                <div className="text-xl md:text-2xl text-slate-500 font-medium italic">Start Adventure</div>
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            );
+    function showActivities(unitIndex) {
+      currentUnit = unitIndex;
+      const style = gradeStyles[currentGrade];
+      const unitLabel = `單元${UNIT_NAMES[unitIndex]}`;
+      const tag = document.getElementById('activity-unit-tag');
+      tag.textContent = `${style.label} · ${unitLabel}`;
+      tag.style.background = style.bg;
+      document.getElementById('bc-grade2').textContent = style.label;
+      document.getElementById('bc-unit').textContent = unitLabel;
 
-            const renderLesson = () => {
-                const data = phonicsData[activeGroup];
-                if (!data) return null;
-                return (
-                    <div className="flex flex-col min-h-screen pb-24">
-                        <div className="flex items-center justify-between p-4 md:p-8 bg-white/80 border-b-4 border-emerald-100 backdrop-blur-sm sticky top-0 z-50">
-                            <button onClick={() => setCurrentPage('home')} className="flex items-center gap-2 text-xl md:text-2xl font-bold text-emerald-600 hover:text-orange-400 transition-colors"><Home size={32} /> 回主選單</button>
-                            <div className="text-2xl md:text-4xl font-black ${data.textColor}">{data.title}</div>
-                        </div>
-                        <div className="flex-1 flex flex-col items-center justify-center p-4 md:p-8">
-                            <div className="w-full max-w-6xl bg-white/95 p-6 md:p-12 rounded-[2rem] md:rounded-[4rem] shadow-2xl border-4 border-white relative overflow-hidden">
-                                {step === 0 && (
-                                    <div className="text-center space-y-10 animate-in zoom-in duration-500">
-                                        <div className={`${data.accentColor} inline-block p-6 rounded-full text-white mb-4 shadow-lg`}><Sparkles size={64} /></div>
-                                        <h2 className="text-5xl md:text-7xl font-black text-slate-700">發音規則</h2>
-                                        <div className="space-y-6">
-                                            <p className="text-3xl md:text-5xl leading-relaxed font-bold px-4 md:px-12">{data.rule}</p>
-                                            <div className="bg-emerald-50 p-6 md:p-8 rounded-3xl border-2 border-emerald-100 inline-block">
-                                                <p className="text-2xl md:text-3xl text-emerald-900/70 italic font-bold">💡 {data.ruleHint}</p>
-                                            </div>
-                                        </div>
-                                        <button onClick={() => handleSpeak(data.rule, 'rule')} className="mt-6 flex items-center gap-4 mx-auto px-8 py-4 bg-slate-100 hover:bg-slate-200 rounded-2xl text-xl md:text-2xl font-bold transition-all hover:scale-105 shadow-sm">
-                                            <Volume2 className="text-emerald-500" /> 聽規則發音 <StatusBadge id="rule" />
-                                        </button>
-                                    </div>
-                                )}
-                                {step === 1 && (
-                                    <div className="animate-in slide-in-from-right duration-500">
-                                        <h2 className="text-4xl md:text-6xl font-black text-center mb-8 md:mb-16 flex items-center justify-center gap-6"><BookOpen size={56} className={data.textColor} /> 精選單字卡</h2>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-                                            {data.words.map((item, idx) => (
-                                                <div key={idx} className="bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] border-4 border-emerald-50 shadow-lg hover:shadow-2xl transition-all group relative">
-                                                    <button onClick={() => handleSpeak(item.word, `w-${idx}`)} className={`absolute top-6 right-6 p-4 rounded-2xl ${isSpeaking === `w-${idx}` ? 'bg-emerald-400 text-white' : 'bg-emerald-50 text-emerald-400 shadow-sm group-hover:scale-110'}`}>
-                                                        {isSpeaking === `w-${idx}` ? <Loader2 size={32} /> : <Volume2 size={32} />}
-                                                    </button>
-                                                    <div className="text-6xl md:text-8xl mb-4 md:mb-6">{item.icon}</div>
-                                                    <div className={`text-4xl md:text-6xl font-black mb-2 ${data.textColor}`}>{item.word}</div>
-                                                    <div className="text-2xl md:text-3xl text-slate-400 font-bold">{item.trans}</div>
-                                                    <StatusBadge id={`w-${idx}`} />
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                                {step === 2 && (
-                                    <div className="animate-in slide-in-from-bottom duration-500">
-                                        <h2 className="text-4xl md:text-6xl font-black text-center mb-8 md:mb-16 flex items-center justify-center gap-6"><MessageSquare size={56} className={data.textColor} /> 混淆字對抗賽！</h2>
-                                        <div className="space-y-6 md:space-y-10">
-                                            {data.comparisons.map((item, idx) => (
-                                                <div key={idx} className="bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] border-4 border-emerald-50 shadow-xl relative group flex flex-col md:flex-row items-center gap-6 md:gap-8">
-                                                    <div className="flex-1 text-center md:text-left">
-                                                        <div className={`text-2xl md:text-3xl font-black mb-2 md:mb-4 uppercase tracking-widest ${data.textColor}`}>{item.pair}</div>
-                                                        <p className="text-3xl md:text-5xl font-black leading-tight mb-2 md:mb-4 text-slate-700">
-                                                            {item.sentence.split(' ').map((word, i) => {
-                                                                const targets = ['bed', 'egg', 'pen', 'red', 'net', 'pete', 'eve', 'these', 'gene', 'theme', 'pet', 'them', 'met', 'mete', 'steve', 'step'];
-                                                                return <span key={i} className={targets.includes(word.toLowerCase().replace(/[^a-z-]/g, '')) ? "text-emerald-500 underline underline-offset-8 mx-1 md:mx-2" : "mx-1 md:mx-2"}>{word}</span>;
-                                                            })}
-                                                        </p>
-                                                        <p className="text-xl md:text-3xl text-slate-400 font-bold">{item.trans}</p>
-                                                    </div>
-                                                    <button onClick={() => handleSpeak(item.sentence, item.id)} className={`p-6 md:p-8 rounded-3xl transition-all ${isSpeaking === item.id ? 'bg-emerald-400 text-white animate-pulse' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 shadow-md'}`}>
-                                                        {isSpeaking === item.id ? <Loader2 size={48} /> : <Volume2 size={48} />}
-                                                    </button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                        <div className="p-4 md:p-8 flex justify-between fixed bottom-12 w-full left-0 z-40 bg-white/50 backdrop-blur-sm">
-                            <button onClick={prevStep} className="px-6 md:px-12 py-4 md:py-6 bg-white border-4 border-orange-100 rounded-3xl text-xl md:text-3xl font-black text-orange-400 shadow-md flex items-center gap-3"><ChevronLeft size={40} /> 上一頁</button>
-                            <button onClick={nextStep} className={`px-8 md:px-16 py-4 md:py-6 ${data.accentColor} rounded-3xl text-xl md:text-3xl font-black text-white shadow-xl flex items-center gap-3`}>{step === 2 ? "結束本課" : "下一頁"} <ChevronRight size={40} /></button>
-                        </div>
-                    </div>
-                );
-            };
+      const activities = makeActivities(currentGrade, unitIndex);
+      const grid = document.getElementById('activity-grid');
+      grid.innerHTML = activities.map(a => {
+        const isSoon = a.href === '#';
+        return `
+          <a href="${a.href}" class="activity-card${isSoon ? ' coming-soon' : ''}" data-type="${a.type}"
+             ${isSoon ? '' : 'target="_blank" rel="noopener"'}>
+            <span class="activity-icon">${a.icon}</span>
+            <div class="activity-cn">${a.cn}</div>
+            <div class="activity-en">${a.en}</div>
+          </a>
+        `;
+      }).join('');
+      switchView('view-activity');
+    }
 
-            return (
-                <div className="font-sans min-h-screen">
-                    {currentPage === 'home' ? renderHome() : renderLesson()}
-                    <div className="fixed bottom-0 left-0 w-full bg-slate-900 text-cyan-400 px-4 py-2 text-sm font-mono flex items-center justify-between z-[9999] border-t border-cyan-900/50">
-                        <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse"></span> {debugMsg}</div>
-                        <div className="text-xs text-slate-500 uppercase">AppID: {appId}</div>
-                    </div>
-                </div>
-            );
-        };
+    function goBack(to) {
+      if (to === 'grade') switchView('view-grade');
+      if (to === 'unit')  switchView('view-unit');
+    }
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
+    function switchView(id) {
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const el = document.activeElement;
+      if (el.classList.contains('grade-card') || el.classList.contains('unit-card')) {
+        e.preventDefault();
+        el.click();
+      }
+    });
+  </script>
 </body>
 </html>
