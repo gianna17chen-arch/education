@@ -1,6 +1,415 @@
-function makeActivities(grade, unitIndex) {
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>英語冒險王國 English Adventure Kingdom</title>
+  <style>
+    /* ===== CSS 變數：馬卡龍色系 ===== */
+    :root {
+      --pink:     #FFB3C6;
+      --pink-dark:#FF8FAD;
+      --lavender: #C9B8F0;
+      --lavender-dark:#A898E0;
+      --mint:     #B5EAD7;
+      --mint-dark:#82D4B4;
+      --yellow:   #FFF0B3;
+      --yellow-dark:#FFD966;
+      --peach:    #FFD7BE;
+      --peach-dark:#FFB88C;
+      --sky:      #BAD7F8;
+      --sky-dark: #7EB8F2;
+      --cream:    #FFF9F0;
+      --white:    #FFFFFF;
+      --text-dark:#4A3728;
+      --text-mid: #7A6050;
+      --shadow:   rgba(100, 70, 50, 0.15);
+      --radius:   20px;
+      --radius-sm:12px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+      background: var(--cream);
+      color: var(--text-dark);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ===== 背景浮動氣泡 ===== */
+    .bg-bubbles { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+    .bubble { position: absolute; border-radius: 50%; opacity: 0.18; animation: floatUp linear infinite; }
+    .bubble:nth-child(1) { width:80px;  height:80px;  left:5%;  background:var(--pink);     animation-duration:18s; animation-delay:0s;   bottom:-100px; }
+    .bubble:nth-child(2) { width:50px;  height:50px;  left:15%; background:var(--lavender); animation-duration:22s; animation-delay:3s;   bottom:-100px; }
+    .bubble:nth-child(3) { width:120px; height:120px; left:30%; background:var(--mint);     animation-duration:16s; animation-delay:6s;   bottom:-100px; }
+    .bubble:nth-child(4) { width:60px;  height:60px;  left:50%; background:var(--yellow);   animation-duration:20s; animation-delay:1s;   bottom:-100px; }
+    .bubble:nth-child(5) { width:90px;  height:90px;  left:70%; background:var(--peach);    animation-duration:25s; animation-delay:9s;   bottom:-100px; }
+    .bubble:nth-child(6) { width:40px;  height:40px;  left:85%; background:var(--sky);      animation-duration:19s; animation-delay:4s;   bottom:-100px; }
+    .bubble:nth-child(7) { width:70px;  height:70px;  left:92%; background:var(--pink);     animation-duration:23s; animation-delay:12s;  bottom:-100px; }
+
+    @keyframes floatUp {
+      0%   { transform: translateY(0) scale(1);       opacity: 0.18; }
+      50%  { transform: translateY(-50vh) scale(1.1); opacity: 0.12; }
+      100% { transform: translateY(-110vh) scale(0.9); opacity: 0; }
+    }
+
+    /* ===== 頁首 ===== */
+    header {
+      position: relative; z-index: 10;
+      background: linear-gradient(135deg, var(--sky) 0%, var(--lavender) 50%, var(--pink) 100%);
+      padding: 2rem 1.5rem 2.5rem;
+      text-align: center; overflow: hidden;
+      box-shadow: 0 4px 20px var(--shadow);
+    }
+    .header-stars { position: absolute; inset: 0; pointer-events: none; }
+    .star { position: absolute; font-size: 1.4rem; animation: twinkle ease-in-out infinite; }
+    .star:nth-child(1) { top:15%; left:5%;  animation-duration:2.1s; animation-delay:0s; }
+    .star:nth-child(2) { top:30%; left:12%; animation-duration:1.8s; animation-delay:0.5s; }
+    .star:nth-child(3) { top:10%; left:80%; animation-duration:2.4s; animation-delay:1s; }
+    .star:nth-child(4) { top:50%; left:90%; animation-duration:1.6s; animation-delay:0.3s; }
+    .star:nth-child(5) { top:70%; left:8%;  animation-duration:2.2s; animation-delay:1.5s; }
+    .star:nth-child(6) { top:80%; left:75%; animation-duration:1.9s; animation-delay:0.8s; }
+    .star:nth-child(7) { top:20%; left:50%; animation-duration:2.6s; animation-delay:0.2s; }
+    .star:nth-child(8) { top:60%; left:55%; animation-duration:1.7s; animation-delay:1.2s; }
+
+    @keyframes twinkle {
+      0%, 100% { opacity: 1;   transform: scale(1)   rotate(0deg); }
+      50%       { opacity: 0.3; transform: scale(0.6) rotate(20deg); }
+    }
+
+    .header-mascot {
+      font-size: 4rem; display: block;
+      animation: mascotFloat 3s ease-in-out infinite;
+      filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15));
+    }
+    @keyframes mascotFloat {
+      0%, 100% { transform: translateY(0px) rotate(-3deg); }
+      50%       { transform: translateY(-10px) rotate(3deg); }
+    }
+    .header-title {
+      font-size: clamp(1.6rem, 5vw, 2.8rem); font-weight: 900;
+      color: var(--white);
+      text-shadow: 0 3px 10px rgba(100,60,40,0.3), 0 1px 0 rgba(255,255,255,0.5);
+      letter-spacing: 0.05em; margin-top: 0.5rem;
+    }
+    .header-subtitle {
+      font-size: clamp(0.85rem, 2.5vw, 1.1rem);
+      color: rgba(255,255,255,0.9); margin-top: 0.4rem;
+      letter-spacing: 0.08em; text-shadow: 0 1px 4px rgba(100,60,40,0.2);
+    }
+    .header-badge {
+      display: inline-block;
+      background: rgba(255,255,255,0.35);
+      border: 2px solid rgba(255,255,255,0.6);
+      border-radius: 50px; padding: 0.25rem 1rem;
+      font-size: 0.8rem; color: var(--white); margin-top: 0.8rem;
+      backdrop-filter: blur(4px); letter-spacing: 0.05em;
+    }
+
+    /* ===== 麵包屑 ===== */
+    .breadcrumb {
+      display: flex; align-items: center; gap: 0.4rem;
+      font-size: 0.82rem; color: var(--text-mid);
+      margin-bottom: 1.4rem; flex-wrap: wrap;
+    }
+    .breadcrumb .crumb {
+      cursor: pointer; color: var(--lavender-dark); font-weight: 700;
+      text-decoration: underline; text-underline-offset: 2px;
+    }
+    .breadcrumb .crumb:hover { color: var(--pink-dark); }
+    .breadcrumb .sep { color: var(--peach-dark); }
+    .breadcrumb .current { color: var(--text-dark); font-weight: 700; }
+
+    /* ===== 主體容器 ===== */
+    main { position: relative; z-index: 5; max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem 3rem; }
+
+    /* ===== 畫面切換 ===== */
+    .view { display: none; animation: fadeIn 0.35s ease; }
+    .view.active { display: block; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ===== 區塊標題 ===== */
+    .section-label { text-align: center; margin-bottom: 1.8rem; }
+    .section-label h2 {
+      font-size: clamp(1.2rem, 3.5vw, 1.6rem); font-weight: 800;
+      color: var(--text-dark);
+      display: inline-flex; align-items: center; gap: 0.5rem;
+    }
+    .section-label p { font-size: 0.88rem; color: var(--text-mid); margin-top: 0.35rem; }
+
+    /* ===== 返回按鈕 ===== */
+    .back-btn {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      background: var(--white); border: 2.5px solid var(--peach-dark);
+      border-radius: 50px; padding: 0.6rem 1.4rem;
+      font-size: 0.95rem; font-weight: 700; color: var(--text-dark);
+      cursor: pointer; transition: all 0.2s;
+      box-shadow: 0 3px 10px var(--shadow); margin-bottom: 1.8rem;
+    }
+    .back-btn:hover { background: var(--peach); transform: translateX(-4px); box-shadow: 0 5px 16px var(--shadow); }
+    .back-btn:active { transform: scale(0.96); }
+
+    /* ===== 年級網格 ===== */
+    .grade-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.4rem;
+      max-width: 560px;
+      margin: 0 auto;
+    }
+
+    .grade-card {
+      background: var(--white); border-radius: var(--radius);
+      padding: 2.5rem 1.5rem; text-align: center; cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      box-shadow: 0 4px 16px var(--shadow);
+      border: 3px solid transparent;
+      position: relative; overflow: hidden;
+      display: block;
+    }
+    .grade-card::before {
+      content: ''; position: absolute; inset: 0;
+      opacity: 0.18; transition: opacity 0.2s;
+    }
+    .grade-card:hover { transform: translateY(-6px) scale(1.02); box-shadow: 0 10px 32px var(--shadow); }
+    .grade-card:active { transform: scale(0.97); }
+
+    .grade-card[data-grade="4"] { border-color: var(--lavender); }
+    .grade-card[data-grade="4"]::before { background: var(--lavender); }
+    .grade-card[data-grade="4"]:hover { box-shadow: 0 10px 32px rgba(168,152,224,0.35); }
+
+    .grade-card[data-grade="6"] { border-color: var(--yellow); }
+    .grade-card[data-grade="6"]::before { background: var(--yellow); }
+    .grade-card[data-grade="6"]:hover { box-shadow: 0 10px 32px rgba(255,217,102,0.4); }
+
+    .grade-icon {
+      font-size: 4rem; display: block; margin-bottom: 0.8rem;
+      animation: iconBounce 2.5s ease-in-out infinite;
+      position: relative; z-index: 1;
+    }
+    .grade-card:nth-child(2) .grade-icon { animation-delay: 0.4s; }
+
+    @keyframes iconBounce {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(-6px); }
+    }
+    .grade-cn { font-size: 1.6rem; font-weight: 800; color: var(--text-dark); position: relative; z-index: 1; }
+    .grade-en { font-size: 0.9rem; color: var(--text-mid); font-weight: 600; margin-top: 0.2rem; position: relative; z-index: 1; }
+    .grade-desc { font-size: 0.78rem; color: var(--text-mid); margin-top: 0.5rem; position: relative; z-index: 1; }
+
+    .grade-ribbon {
+      position: absolute; top: 12px; right: -28px;
+      width: 100px; text-align: center;
+      font-size: 0.65rem; font-weight: 700; color: #fff; padding: 3px 0;
+      transform: rotate(30deg); letter-spacing: 0.05em;
+    }
+    .grade-card[data-grade="4"] .grade-ribbon { background: var(--lavender-dark); }
+    .grade-card[data-grade="6"] .grade-ribbon { background: var(--yellow-dark); color: #5a4a00; }
+
+    /* ===== 單元網格 ===== */
+    .unit-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.2rem;
+      max-width: 560px;
+      margin: 0 auto;
+    }
+
+    .unit-card {
+      background: var(--white); border-radius: var(--radius);
+      padding: 2rem 1.2rem; text-align: center; cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      box-shadow: 0 4px 16px var(--shadow);
+      border: 3px solid var(--peach);
+      position: relative; overflow: hidden;
+      display: block;
+    }
+    .unit-card::before {
+      content: ''; position: absolute; inset: 0;
+      background: var(--peach); opacity: 0.12; transition: opacity 0.2s;
+    }
+    .unit-card:hover { transform: translateY(-5px); box-shadow: 0 10px 28px rgba(255,184,140,0.35); border-color: var(--peach-dark); }
+    .unit-card:active { transform: scale(0.97); }
+
+    .unit-icon { font-size: 3rem; display: block; margin-bottom: 0.7rem; position: relative; z-index: 1; }
+    .unit-cn { font-size: 1.3rem; font-weight: 800; color: var(--text-dark); position: relative; z-index: 1; }
+    .unit-en { font-size: 0.82rem; color: var(--text-mid); font-weight: 600; margin-top: 0.2rem; position: relative; z-index: 1; }
+
+    .unit-card.grade-4 { border-color: var(--lavender); }
+    .unit-card.grade-4::before { background: var(--lavender); }
+    .unit-card.grade-4:hover { border-color: var(--lavender-dark); }
+
+    .unit-card.grade-6 { border-color: var(--yellow); }
+    .unit-card.grade-6::before { background: var(--yellow); }
+    .unit-card.grade-6:hover { border-color: var(--yellow-dark); }
+
+    /* ===== 活動網格 ===== */
+    .activity-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.2rem;
+      max-width: 560px;
+      margin: 0 auto;
+    }
+
+    .activity-card {
+      background: var(--white); border-radius: var(--radius);
+      padding: 2rem 1.2rem; text-align: center;
+      text-decoration: none; color: var(--text-dark);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      box-shadow: 0 4px 16px var(--shadow);
+      border: 3px solid transparent;
+      position: relative; overflow: hidden;
+      display: block;
+    }
+    .activity-card::before {
+      content: ''; position: absolute; inset: 0;
+      opacity: 0.18; transition: opacity 0.2s;
+    }
+    .activity-card:hover { transform: translateY(-5px); box-shadow: 0 10px 28px var(--shadow); }
+    .activity-card:active { transform: scale(0.97); }
+
+    .activity-card[data-type="vocab"]    { border-color: var(--pink);     }
+    .activity-card[data-type="vocab"]::before    { background: var(--pink); }
+    .activity-card[data-type="basic"]   { border-color: var(--mint);     }
+    .activity-card[data-type="basic"]::before    { background: var(--mint); }
+    .activity-card[data-type="advanced"]{ border-color: var(--lavender); }
+    .activity-card[data-type="advanced"]::before { background: var(--lavender); }
+    .activity-card[data-type="listen"]  { border-color: var(--sky);      }
+    .activity-card[data-type="listen"]::before   { background: var(--sky); }
+
+    .activity-card.coming-soon { opacity: 0.72; pointer-events: none; }
+    .activity-card.coming-soon::after {
+      content: '🔜 即將開放';
+      position: absolute; top: 8px; right: 8px;
+      background: rgba(255,255,255,0.88);
+      border-radius: 20px; padding: 2px 9px;
+      font-size: 0.6rem; font-weight: 700; color: var(--text-mid); z-index: 3;
+    }
+
+    .activity-icon { font-size: 2.8rem; display: block; margin-bottom: 0.6rem; position: relative; z-index: 1; }
+    .activity-cn { font-size: 1.1rem; font-weight: 800; color: var(--text-dark); position: relative; z-index: 1; }
+    .activity-en { font-size: 0.75rem; color: var(--text-mid); margin-top: 0.2rem; position: relative; z-index: 1; }
+
+    /* ===== 頁首標題列 ===== */
+    .view-header {
+      display: flex; align-items: center; gap: 0.8rem;
+      flex-wrap: wrap; margin-bottom: 1.6rem;
+    }
+    .view-tag {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      border-radius: 50px; padding: 0.35rem 1rem;
+      font-size: 0.88rem; font-weight: 700; color: var(--text-dark);
+    }
+
+    /* ===== 頁尾 ===== */
+    footer { position: relative; z-index: 5; text-align: center; padding: 1.5rem; font-size: 0.78rem; color: var(--text-mid); }
+    footer span { color: var(--pink-dark); }
+
+    @media (max-width: 480px) {
+      .grade-grid, .unit-grid, .activity-grid { grid-template-columns: repeat(2, 1fr); gap: 0.8rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="bg-bubbles" aria-hidden="true">
+    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
+    <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
+    <div class="bubble"></div>
+  </div>
+
+  <header>
+    <div class="header-stars" aria-hidden="true">
+      <span class="star">✨</span><span class="star">⭐</span>
+      <span class="star">✨</span><span class="star">🌟</span>
+      <span class="star">✨</span><span class="star">⭐</span>
+      <span class="star">✨</span><span class="star">🌟</span>
+    </div>
+    <span class="header-mascot" aria-hidden="true">🧙‍♀️</span>
+    <h1 class="header-title">英語冒險王國</h1>
+    <p class="header-subtitle">English Adventure Kingdom</p>
+    <span class="header-badge">⚔️ 選擇你的冒險 · Choose Your Quest ⚔️</span>
+  </header>
+
+  <main>
+
+    <div id="view-grade" class="view active">
+      <div class="section-label">
+        <h2>🗂️ 選擇年級</h2>
+        <p>Select Your Grade · 點選卡片開始冒險！</p>
+      </div>
+      <div class="grade-grid">
+        <div class="grade-card" data-grade="4" onclick="showUnits(4)" role="button" tabindex="0">
+          <span class="grade-ribbon">QUEST</span>
+          <span class="grade-icon">🏰</span>
+          <div class="grade-cn">四年級</div>
+          <div class="grade-en">Grade 4</div>
+          <div class="grade-desc">進階單字 · 句型練習</div>
+        </div>
+        <div class="grade-card" data-grade="6" onclick="showUnits(6)" role="button" tabindex="0">
+          <span class="grade-ribbon">MASTER</span>
+          <span class="grade-icon">⚔️</span>
+          <div class="grade-cn">六年級</div>
+          <div class="grade-en">Grade 6</div>
+          <div class="grade-desc">綜合應用 · 挑戰關卡</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="view-unit" class="view">
+      <div class="view-header">
+        <button class="back-btn" onclick="goBack('grade')">← 返回年級選擇</button>
+        <span id="unit-grade-tag" class="view-tag"></span>
+      </div>
+      <div class="breadcrumb">
+        <span class="crumb" onclick="goBack('grade')">首頁</span>
+        <span class="sep">›</span>
+        <span id="bc-grade" class="current"></span>
+      </div>
+      <div class="section-label">
+        <h2>📚 選擇單元</h2>
+        <p>Select Your Unit · 點選單元進入關卡！</p>
+      </div>
+      <div id="unit-grid" class="unit-grid"></div>
+    </div>
+
+    <div id="view-activity" class="view">
+      <div class="view-header">
+        <button class="back-btn" onclick="goBack('unit')">← 返回單元選擇</button>
+        <span id="activity-unit-tag" class="view-tag"></span>
+      </div>
+      <div class="breadcrumb">
+        <span class="crumb" onclick="goBack('grade')">首頁</span>
+        <span class="sep">›</span>
+        <span id="bc-grade2" class="crumb" onclick="goBack('unit')"></span>
+        <span class="sep">›</span>
+        <span id="bc-unit" class="current"></span>
+      </div>
+      <div class="section-label">
+        <h2>🎯 選擇活動</h2>
+        <p>Select Your Activity · 開始你的學習！</p>
+      </div>
+      <div id="activity-grid" class="activity-grid"></div>
+    </div>
+
+  </main>
+
+  <footer>Made with <span>♥</span> for young English adventurers · 英語冒險王國</footer>
+
+  <script>
+    // ===== 資料結構 =====
+    const UNIT_ICONS = ['📖','🌟','🎯','🏆'];
+    const UNIT_NAMES = ['一','二','三','四'];
+
+    function makeActivities(grade, unitIndex) {
       const links = {
-        // 四年級單元 (Grade 4) - 已修正為 grade4
+        // 四年級單元 (grade4)
         '4-0': { 
           vocab: 'https://gianna17chen-arch.github.io/education/grade4/ch1/vocabulary', 
           basic: 'https://gianna17chen-arch.github.io/education/grade4/ch1/grammar_basic', 
@@ -25,7 +434,7 @@ function makeActivities(grade, unitIndex) {
           advanced: 'https://gianna17chen-arch.github.io/education/grade4/ch4/grammar_advanced', 
           listen: 'https://gianna17chen-arch.github.io/education/grade4/ch4/listning' 
         },
-        // 六年級單元 (Grade 6) - 已修正為 grade6
+        // 六年級單元 (grade6)
         '6-0': { 
           vocab: 'https://gianna17chen-arch.github.io/education/grade6/ch1/vocabulary', 
           basic: 'https://gianna17chen-arch.github.io/education/grade6/ch1/grammar_basic', 
@@ -51,4 +460,87 @@ function makeActivities(grade, unitIndex) {
           listen: 'https://gianna17chen-arch.github.io/education/grade6/ch4/listning' 
         }
       };
-      // ... 略
+
+      const key = `${grade}-${unitIndex}`;
+      const l = links[key] || {};
+      return [
+        { type: 'vocab',    icon: '🔤', cn: '單字',   en: 'Vocabulary',      href: l.vocab    || '#' },
+        { type: 'basic',    icon: '📐', cn: '基礎文法', en: 'Basic Grammar',   href: l.basic    || '#' },
+        { type: 'advanced', icon: '🧩', cn: '進階文法', en: 'Advanced Grammar', href: l.advanced || '#' },
+        { type: 'listen',   icon: '🎧', cn: '聽力朗讀', en: 'Listening',        href: l.listen   || '#' },
+      ];
+    }
+
+    const gradeStyles = {
+      4: { bg: '#C9B8F0', label: '🏰 四年級', cls: 'grade-4' },
+      6: { bg: '#FFF0B3', label: '⚔️ 六年級', cls: 'grade-6' },
+    };
+
+    let currentGrade = null;
+
+    function showUnits(grade) {
+      currentGrade = grade;
+      const style = gradeStyles[grade];
+      const tag = document.getElementById('unit-grade-tag');
+      tag.textContent = style.label;
+      tag.style.background = style.bg;
+      document.getElementById('bc-grade').textContent = style.label;
+
+      const grid = document.getElementById('unit-grid');
+      grid.innerHTML = UNIT_NAMES.map((name, i) => `
+        <div class="unit-card ${style.cls}" onclick="showActivities(${i})" role="button" tabindex="0">
+          <span class="unit-icon">${UNIT_ICONS[i]}</span>
+          <div class="unit-cn">單元${name}</div>
+          <div class="unit-en">Unit ${i + 1}</div>
+        </div>
+      `).join('');
+      switchView('view-unit');
+    }
+
+    function showActivities(unitIndex) {
+      const style = gradeStyles[currentGrade];
+      const unitLabel = `單元${UNIT_NAMES[unitIndex]}`;
+      const tag = document.getElementById('activity-unit-tag');
+      tag.textContent = `${style.label} · ${unitLabel}`;
+      tag.style.background = style.bg;
+      document.getElementById('bc-grade2').textContent = style.label;
+      document.getElementById('bc-unit').textContent = unitLabel;
+
+      const activities = makeActivities(currentGrade, unitIndex);
+      const grid = document.getElementById('activity-grid');
+      grid.innerHTML = activities.map(a => {
+        const isSoon = a.href === '#';
+        return `
+          <a href="${a.href}" class="activity-card${isSoon ? ' coming-soon' : ''}" data-type="${a.type}"
+             ${isSoon ? '' : 'target="_blank" rel="noopener"'}>
+            <span class="activity-icon">${a.icon}</span>
+            <div class="activity-cn">${a.cn}</div>
+            <div class="activity-en">${a.en}</div>
+          </a>
+        `;
+      }).join('');
+      switchView('view-activity');
+    }
+
+    function goBack(to) {
+      if (to === 'grade') switchView('view-grade');
+      if (to === 'unit')  switchView('view-unit');
+    }
+
+    function switchView(id) {
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const el = document.activeElement;
+      if (el.classList.contains('grade-card') || el.classList.contains('unit-card')) {
+        e.preventDefault();
+        el.click();
+      }
+    });
+  </script>
+</body>
+</html>
