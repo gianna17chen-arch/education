@@ -154,65 +154,8 @@
     .back-btn:hover { background: var(--peach); transform: translateX(-4px); box-shadow: 0 5px 16px var(--shadow); }
     .back-btn:active { transform: scale(0.96); }
 
-    /* ===== 年級網格 ===== */
-    .grade-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 1.4rem;
-      max-width: 560px;
-      margin: 0 auto;
-    }
-
-    .grade-card {
-      background: var(--white); border-radius: var(--radius);
-      padding: 2.5rem 1.5rem; text-align: center; cursor: pointer;
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-      box-shadow: 0 4px 16px var(--shadow);
-      border: 3px solid transparent;
-      position: relative; overflow: hidden;
-      display: block;
-    }
-    .grade-card::before {
-      content: ''; position: absolute; inset: 0;
-      opacity: 0.18; transition: opacity 0.2s;
-    }
-    .grade-card:hover { transform: translateY(-6px) scale(1.02); box-shadow: 0 10px 32px var(--shadow); }
-    .grade-card:active { transform: scale(0.97); }
-
-    .grade-card[data-grade="4"] { border-color: var(--lavender); }
-    .grade-card[data-grade="4"]::before { background: var(--lavender); }
-    .grade-card[data-grade="4"]:hover { box-shadow: 0 10px 32px rgba(168,152,224,0.35); }
-
-    .grade-card[data-grade="6"] { border-color: var(--yellow); }
-    .grade-card[data-grade="6"]::before { background: var(--yellow); }
-    .grade-card[data-grade="6"]:hover { box-shadow: 0 10px 32px rgba(255,217,102,0.4); }
-
-    .grade-icon {
-      font-size: 4rem; display: block; margin-bottom: 0.8rem;
-      animation: iconBounce 2.5s ease-in-out infinite;
-      position: relative; z-index: 1;
-    }
-    .grade-card:nth-child(2) .grade-icon { animation-delay: 0.4s; }
-
-    @keyframes iconBounce {
-      0%, 100% { transform: translateY(0); }
-      50%       { transform: translateY(-6px); }
-    }
-    .grade-cn { font-size: 1.6rem; font-weight: 800; color: var(--text-dark); position: relative; z-index: 1; }
-    .grade-en { font-size: 0.9rem; color: var(--text-mid); font-weight: 600; margin-top: 0.2rem; position: relative; z-index: 1; }
-    .grade-desc { font-size: 0.78rem; color: var(--text-mid); margin-top: 0.5rem; position: relative; z-index: 1; }
-
-    .grade-ribbon {
-      position: absolute; top: 12px; right: -28px;
-      width: 100px; text-align: center;
-      font-size: 0.65rem; font-weight: 700; color: #fff; padding: 3px 0;
-      transform: rotate(30deg); letter-spacing: 0.05em;
-    }
-    .grade-card[data-grade="4"] .grade-ribbon { background: var(--lavender-dark); }
-    .grade-card[data-grade="6"] .grade-ribbon { background: var(--yellow-dark); color: #5a4a00; }
-
-    /* ===== 單元網格 ===== */
-    .unit-grid {
+    /* ===== 網格佈局 ===== */
+    .grade-grid, .unit-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
       gap: 1.2rem;
@@ -220,68 +163,41 @@
       margin: 0 auto;
     }
 
-    .unit-card {
+    .activity-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.2rem;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    /* ===== 卡片基礎樣式 ===== */
+    .card-base {
       background: var(--white); border-radius: var(--radius);
       padding: 2rem 1.2rem; text-align: center; cursor: pointer;
       transition: transform 0.2s ease, box-shadow 0.2s ease;
       box-shadow: 0 4px 16px var(--shadow);
-      border: 3px solid var(--peach);
-      position: relative; overflow: hidden;
-      display: block;
-    }
-    .unit-card::before {
-      content: ''; position: absolute; inset: 0;
-      background: var(--peach); opacity: 0.12; transition: opacity 0.2s;
-    }
-    .unit-card:hover { transform: translateY(-5px); box-shadow: 0 10px 28px rgba(255,184,140,0.35); border-color: var(--peach-dark); }
-    .unit-card:active { transform: scale(0.97); }
-
-    .unit-icon { font-size: 3rem; display: block; margin-bottom: 0.7rem; position: relative; z-index: 1; }
-    .unit-cn { font-size: 1.3rem; font-weight: 800; color: var(--text-dark); position: relative; z-index: 1; }
-    .unit-en { font-size: 0.82rem; color: var(--text-mid); font-weight: 600; margin-top: 0.2rem; position: relative; z-index: 1; }
-
-    .unit-card.grade-4 { border-color: var(--lavender); }
-    .unit-card.grade-4::before { background: var(--lavender); }
-    .unit-card.grade-4:hover { border-color: var(--lavender-dark); }
-
-    .unit-card.grade-6 { border-color: var(--yellow); }
-    .unit-card.grade-6::before { background: var(--yellow); }
-    .unit-card.grade-6:hover { border-color: var(--yellow-dark); }
-
-    /* ===== 活動網格 ===== */
-    .activity-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 1.2rem;
-      max-width: 560px;
-      margin: 0 auto;
-    }
-
-    .activity-card {
-      background: var(--white); border-radius: var(--radius);
-      padding: 2rem 1.2rem; text-align: center;
-      text-decoration: none; color: var(--text-dark);
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-      box-shadow: 0 4px 16px var(--shadow);
       border: 3px solid transparent;
       position: relative; overflow: hidden;
-      display: block;
+      display: block; text-decoration: none;
     }
-    .activity-card::before {
-      content: ''; position: absolute; inset: 0;
-      opacity: 0.18; transition: opacity 0.2s;
-    }
-    .activity-card:hover { transform: translateY(-5px); box-shadow: 0 10px 28px var(--shadow); }
-    .activity-card:active { transform: scale(0.97); }
+    .card-base::before { content: ''; position: absolute; inset: 0; opacity: 0.18; transition: opacity 0.2s; }
+    .card-base:hover { transform: translateY(-5px); box-shadow: 0 10px 28px var(--shadow); }
+    .card-base:active { transform: scale(0.97); }
 
+    /* 活動卡片顏色 */
     .activity-card[data-type="vocab"]    { border-color: var(--pink);     }
     .activity-card[data-type="vocab"]::before    { background: var(--pink); }
-    .activity-card[data-type="basic"]   { border-color: var(--mint);     }
+    .activity-card[data-type="basic"]    { border-color: var(--mint);     }
     .activity-card[data-type="basic"]::before    { background: var(--mint); }
-    .activity-card[data-type="advanced"]{ border-color: var(--lavender); }
-    .activity-card[data-type="advanced"]::before { background: var(--lavender); }
-    .activity-card[data-type="listen"]  { border-color: var(--sky);      }
-    .activity-card[data-type="listen"]::before   { background: var(--sky); }
+    .activity-card[data-type="listen"]   { border-color: var(--sky);      }
+    .activity-card[data-type="listen"]::before   { background: var(--sky);  }
+    .activity-card[data-type="comp1"]    { border-color: var(--yellow);   }
+    .activity-card[data-type="comp1"]::before    { background: var(--yellow); }
+    .activity-card[data-type="comp2"]    { border-color: var(--peach);    }
+    .activity-card[data-type="comp2"]::before    { background: var(--peach);  }
+    .activity-card[data-type="comp3"]    { border-color: var(--lavender); }
+    .activity-card[data-type="comp3"]::before    { background: var(--lavender);}
 
     .activity-card.coming-soon { opacity: 0.72; pointer-events: none; }
     .activity-card.coming-soon::after {
@@ -296,23 +212,29 @@
     .activity-cn { font-size: 1.1rem; font-weight: 800; color: var(--text-dark); position: relative; z-index: 1; }
     .activity-en { font-size: 0.75rem; color: var(--text-mid); margin-top: 0.2rem; position: relative; z-index: 1; }
 
-    /* ===== 頁首標題列 ===== */
-    .view-header {
-      display: flex; align-items: center; gap: 0.8rem;
-      flex-wrap: wrap; margin-bottom: 1.6rem;
-    }
+    /* 年級特定樣式 */
+    .grade-card { padding: 2.5rem 1.5rem; }
+    .grade-card[data-grade="4"] { border-color: var(--lavender); }
+    .grade-card[data-grade="4"]::before { background: var(--lavender); }
+    .grade-card[data-grade="6"] { border-color: var(--yellow); }
+    .grade-card[data-grade="6"]::before { background: var(--yellow); }
+
     .view-tag {
       display: inline-flex; align-items: center; gap: 0.4rem;
       border-radius: 50px; padding: 0.35rem 1rem;
       font-size: 0.88rem; font-weight: 700; color: var(--text-dark);
     }
 
-    /* ===== 頁尾 ===== */
     footer { position: relative; z-index: 5; text-align: center; padding: 1.5rem; font-size: 0.78rem; color: var(--text-mid); }
     footer span { color: var(--pink-dark); }
 
-    @media (max-width: 480px) {
-      .grade-grid, .unit-grid, .activity-grid { grid-template-columns: repeat(2, 1fr); gap: 0.8rem; }
+    /* 響應式佈局 */
+    @media (max-width: 650px) {
+       .activity-grid { grid-template-columns: repeat(3, 1fr); gap: 0.6rem; }
+       .activity-card { padding: 1rem 0.4rem; }
+       .activity-icon { font-size: 1.8rem; }
+       .activity-cn { font-size: 0.85rem; }
+       .activity-en { font-size: 0.55rem; }
     }
   </style>
 </head>
@@ -338,26 +260,21 @@
   </header>
 
   <main>
-
     <div id="view-grade" class="view active">
       <div class="section-label">
         <h2>🗂️ 選擇年級</h2>
         <p>Select Your Grade · 點選卡片開始冒險！</p>
       </div>
       <div class="grade-grid">
-        <div class="grade-card" data-grade="4" onclick="showUnits(4)" role="button" tabindex="0">
-          <span class="grade-ribbon">QUEST</span>
-          <span class="grade-icon">🏰</span>
-          <div class="grade-cn">四年級</div>
-          <div class="grade-en">Grade 4</div>
-          <div class="grade-desc">進階單字 · 句型練習</div>
+        <div class="card-base grade-card" data-grade="4" onclick="showUnits(4)" role="button" tabindex="0">
+          <span class="activity-icon">🏰</span>
+          <div class="activity-cn">四年級</div>
+          <div class="activity-en">Grade 4</div>
         </div>
-        <div class="grade-card" data-grade="6" onclick="showUnits(6)" role="button" tabindex="0">
-          <span class="grade-ribbon">MASTER</span>
-          <span class="grade-icon">⚔️</span>
-          <div class="grade-cn">六年級</div>
-          <div class="grade-en">Grade 6</div>
-          <div class="grade-desc">綜合應用 · 挑戰關卡</div>
+        <div class="card-base grade-card" data-grade="6" onclick="showUnits(6)" role="button" tabindex="0">
+          <span class="activity-icon">⚔️</span>
+          <div class="activity-cn">六年級</div>
+          <div class="activity-en">Grade 6</div>
         </div>
       </div>
     </div>
@@ -397,13 +314,11 @@
       </div>
       <div id="activity-grid" class="activity-grid"></div>
     </div>
-
   </main>
 
   <footer>Made with <span>♥</span> for young English adventurers · 英語冒險王國</footer>
 
   <script>
-    // ===== 資料結構 =====
     const UNIT_ICONS = ['📖','🌟','🎯','🏆'];
     const UNIT_NAMES = ['一','二','三','四'];
 
@@ -411,63 +326,82 @@
       const links = {
         // 四年級單元 (grade4)
         '4-0': { 
-          vocab: 'https://gianna17chen-arch.github.io/education/grade4/ch1/vocabulary', 
-          basic: 'https://gianna17chen-arch.github.io/education/grade4/ch1/grammar_basic', 
-          advanced: 'https://gianna17chen-arch.github.io/education/grade4/ch1/grammar_advanced', 
-          listen: 'https://gianna17chen-arch.github.io/education/grade4/ch1/listning' 
+            vocab: 'https://gianna17chen-arch.github.io/education/grade4/ch1/vocabulary', 
+            basic: 'https://gianna17chen-arch.github.io/education/grade4/ch1/sentence', 
+            listen: 'https://gianna17chen-arch.github.io/education/grade4/ch1/listning',
+            comp1: 'https://gianna17chen-arch.github.io/education/grade4/ch1/practice1',
+            comp2: 'https://gianna17chen-arch.github.io/education/grade4/ch1/practice2',
+            comp3: 'https://gianna17chen-arch.github.io/education/grade4/ch1/practice3'
         },
         '4-1': { 
-          vocab: 'https://gianna17chen-arch.github.io/education/grade4/ch2/vocabulary', 
-          basic: 'https://gianna17chen-arch.github.io/education/grade4/ch2/grammar_basic', 
-          advanced: 'https://gianna17chen-arch.github.io/education/grade4/ch2/grammar_advanced', 
-          listen: 'https://gianna17chen-arch.github.io/education/grade4/ch2/listning' 
+            vocab: 'https://gianna17chen-arch.github.io/education/grade4/ch2/vocabulary', 
+            basic: 'https://gianna17chen-arch.github.io/education/grade4/ch2/sentence', 
+            listen: 'https://gianna17chen-arch.github.io/education/grade4/ch2/listning',
+            comp1: 'https://gianna17chen-arch.github.io/education/grade4/ch2/practice1',
+            comp2: 'https://gianna17chen-arch.github.io/education/grade4/ch2/practice2',
+            comp3: 'https://gianna17chen-arch.github.io/education/grade4/ch2/practice3'
         },
         '4-2': { 
-          vocab: 'https://gianna17chen-arch.github.io/education/grade4/ch3/vocabulary', 
-          basic: 'https://gianna17chen-arch.github.io/education/grade4/ch3/grammar_basic', 
-          advanced: 'https://gianna17chen-arch.github.io/education/grade4/ch3/grammar_advanced', 
-          listen: 'https://gianna17chen-arch.github.io/education/grade4/ch3/listning' 
+            vocab: 'https://gianna17chen-arch.github.io/education/grade4/ch3/vocabulary', 
+            basic: 'https://gianna17chen-arch.github.io/education/grade4/ch3/sentence', 
+            listen: 'https://gianna17chen-arch.github.io/education/grade4/ch3/listning',
+            comp1: 'https://gianna17chen-arch.github.io/education/grade4/ch3/practice1',
+            comp2: 'https://gianna17chen-arch.github.io/education/grade4/ch3/practice2',
+            comp3: 'https://gianna17chen-arch.github.io/education/grade4/ch3/practice3'
         },
         '4-3': { 
-          vocab: 'https://gianna17chen-arch.github.io/education/grade4/ch4/vocabulary', 
-          basic: 'https://gianna17chen-arch.github.io/education/grade4/ch4/grammar_basic', 
-          advanced: 'https://gianna17chen-arch.github.io/education/grade4/ch4/grammar_advanced', 
-          listen: 'https://gianna17chen-arch.github.io/education/grade4/ch4/listning' 
+            vocab: 'https://gianna17chen-arch.github.io/education/grade4/ch4/vocabulary', 
+            basic: 'https://gianna17chen-arch.github.io/education/grade4/ch4/sentence', 
+            listen: 'https://gianna17chen-arch.github.io/education/grade4/ch4/listning',
+            comp1: 'https://gianna17chen-arch.github.io/education/grade4/ch4/practice1',
+            comp2: 'https://gianna17chen-arch.github.io/education/grade4/ch4/practice2',
+            comp3: 'https://gianna17chen-arch.github.io/education/grade4/ch4/practice3'
         },
-        // 六年級單元 (grade6)
+        // 六年級單元 (grade6) - 全面補齊
         '6-0': { 
-          vocab: 'https://gianna17chen-arch.github.io/education/grade6/ch1/vocabulary', 
-          basic: 'https://gianna17chen-arch.github.io/education/grade6/ch1/grammar_basic', 
-          advanced: 'https://gianna17chen-arch.github.io/education/grade6/ch1/grammar_advanced', 
-          listen: 'https://gianna17chen-arch.github.io/education/grade6/ch1/listning' 
+            vocab: 'https://gianna17chen-arch.github.io/education/grade6/ch1/vocabulary', 
+            basic: 'https://gianna17chen-arch.github.io/education/grade6/ch1/sentence', 
+            listen: 'https://gianna17chen-arch.github.io/education/grade6/ch1/listning',
+            comp1: 'https://gianna17chen-arch.github.io/education/grade6/ch1/practice1',
+            comp2: 'https://gianna17chen-arch.github.io/education/grade6/ch1/practice2',
+            comp3: 'https://gianna17chen-arch.github.io/education/grade6/ch1/practice3'
         },
         '6-1': { 
-          vocab: 'https://gianna17chen-arch.github.io/education/grade6/ch2/vocabulary', 
-          basic: 'https://gianna17chen-arch.github.io/education/grade6/ch2/grammar_basic', 
-          advanced: 'https://gianna17chen-arch.github.io/education/grade6/ch2/grammar_advanced', 
-          listen: 'https://gianna17chen-arch.github.io/education/grade6/ch2/listning' 
+            vocab: 'https://gianna17chen-arch.github.io/education/grade6/ch2/vocabulary', 
+            basic: 'https://gianna17chen-arch.github.io/education/grade6/ch2/sentence', 
+            listen: 'https://gianna17chen-arch.github.io/education/grade6/ch2/listning',
+            comp1: 'https://gianna17chen-arch.github.io/education/grade6/ch2/practice1',
+            comp2: 'https://gianna17chen-arch.github.io/education/grade6/ch2/practice2',
+            comp3: 'https://gianna17chen-arch.github.io/education/grade6/ch2/practice3'
         },
         '6-2': { 
-          vocab: 'https://gianna17chen-arch.github.io/education/grade6/ch3/vocabulary', 
-          basic: 'https://gianna17chen-arch.github.io/education/grade6/ch3/grammar_basic', 
-          advanced: 'https://gianna17chen-arch.github.io/education/grade6/ch3/grammar_advanced', 
-          listen: 'https://gianna17chen-arch.github.io/education/grade6/ch3/listning' 
+            vocab: 'https://gianna17chen-arch.github.io/education/grade6/ch3/vocabulary', 
+            basic: 'https://gianna17chen-arch.github.io/education/grade6/ch3/sentence', 
+            listen: 'https://gianna17chen-arch.github.io/education/grade6/ch3/listning',
+            comp1: 'https://gianna17chen-arch.github.io/education/grade6/ch3/practice1',
+            comp2: 'https://gianna17chen-arch.github.io/education/grade6/ch3/practice2',
+            comp3: 'https://gianna17chen-arch.github.io/education/grade6/ch3/practice3'
         },
         '6-3': { 
-          vocab: 'https://gianna17chen-arch.github.io/education/grade6/ch4/vocabulary', 
-          basic: 'https://gianna17chen-arch.github.io/education/grade6/ch4/grammar_basic', 
-          advanced: 'https://gianna17chen-arch.github.io/education/grade6/ch4/grammar_advanced', 
-          listen: 'https://gianna17chen-arch.github.io/education/grade6/ch4/listning' 
+            vocab: 'https://gianna17chen-arch.github.io/education/grade6/ch4/vocabulary', 
+            basic: 'https://gianna17chen-arch.github.io/education/grade6/ch4/sentence', 
+            listen: 'https://gianna17chen-arch.github.io/education/grade6/ch4/listning',
+            comp1: 'https://gianna17chen-arch.github.io/education/grade6/ch4/practice1',
+            comp2: 'https://gianna17chen-arch.github.io/education/grade6/ch4/practice2',
+            comp3: 'https://gianna17chen-arch.github.io/education/grade6/ch4/practice3'
         }
       };
 
       const key = `${grade}-${unitIndex}`;
       const l = links[key] || {};
+      
       return [
-        { type: 'vocab',    icon: '🔤', cn: '單字',   en: 'Vocabulary',      href: l.vocab    || '#' },
-        { type: 'basic',    icon: '📐', cn: '句型',   en: 'Sentence Patterns', href: l.basic    || '#' },
-        { type: 'advanced', icon: '🧩', cn: '進階文法', en: 'Advanced Grammar', href: l.advanced || '#' },
-        { type: 'listen',   icon: '🎧', cn: '發音高手', en: 'Phonics',           href: l.listen   || '#' },
+        { type: 'vocab',    icon: '🔤', cn: '單字',       en: 'Vocabulary',        href: l.vocab  || '#' },
+        { type: 'basic',    icon: '📐', cn: '句型',       en: 'Sentence Patterns', href: l.basic  || '#' },
+        { type: 'listen',   icon: '🎧', cn: '發音高手',   en: 'Phonics',           href: l.listen || '#' },
+        { type: 'comp1',    icon: '📝', cn: '綜合練習(一)', en: 'Practice I',        href: l.comp1  || '#' },
+        { type: 'comp2',    icon: '✍️', cn: '綜合練習(二)', en: 'Practice II',       href: l.comp2  || '#' },
+        { type: 'comp3',    icon: '💡', cn: '綜合練習(三)', en: 'Practice III',      href: l.comp3  || '#' }
       ];
     }
 
@@ -488,10 +422,10 @@
 
       const grid = document.getElementById('unit-grid');
       grid.innerHTML = UNIT_NAMES.map((name, i) => `
-        <div class="unit-card ${style.cls}" onclick="showActivities(${i})" role="button" tabindex="0">
-          <span class="unit-icon">${UNIT_ICONS[i]}</span>
+        <div class="card-base unit-card ${style.cls}" onclick="showActivities(${i})" role="button" tabindex="0">
+          <span class="activity-icon">${UNIT_ICONS[i]}</span>
           <div class="unit-cn">單元${name}</div>
-          <div class="unit-en">Unit ${i + 1}</div>
+          <div class="activity-en">Unit ${i + 1}</div>
         </div>
       `).join('');
       switchView('view-unit');
@@ -511,7 +445,7 @@
       grid.innerHTML = activities.map(a => {
         const isSoon = a.href === '#';
         return `
-          <a href="${a.href}" class="activity-card${isSoon ? ' coming-soon' : ''}" data-type="${a.type}"
+          <a href="${a.href}" class="card-base activity-card${isSoon ? ' coming-soon' : ''}" data-type="${a.type}"
              ${isSoon ? '' : 'target="_blank" rel="noopener"'}>
             <span class="activity-icon">${a.icon}</span>
             <div class="activity-cn">${a.cn}</div>
@@ -536,7 +470,7 @@
     document.addEventListener('keydown', e => {
       if (e.key !== 'Enter' && e.key !== ' ') return;
       const el = document.activeElement;
-      if (el.classList.contains('grade-card') || el.classList.contains('unit-card')) {
+      if (el.classList.contains('card-base')) {
         e.preventDefault();
         el.click();
       }
