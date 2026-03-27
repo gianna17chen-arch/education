@@ -10,7 +10,7 @@
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- Lucide Icons (via CDN) -->
+    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
@@ -29,17 +29,17 @@
     <!-- Firebase SDK (Module) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // 掛載到全域變數 FB
-        window.FB = { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, getFirestore, doc, getDoc, setDoc, collection };
+        window.FB = { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, getFirestore, doc, getDoc, setDoc, collection };
     </script>
 
     <!-- React Application Logic -->
     <script type="text/babel">
-        const { useState, useEffect, useRef, useMemo } = React;
+        const { useState, useEffect } = React;
 
+        // Firebase Configuration
         const firebaseConfig = {
             apiKey: "AIzaSyBnjfbh1ow4j6gXBP9XeBQkCt_cs7Uv3ds",
             authDomain: "education-b38d5.firebaseapp.com",
@@ -51,12 +51,12 @@
         };
 
         const APP_ID = "phonics-f-ph-gh-tr-mimi-v1";
-        const API_KEY = ""; // Gemini API Key
+        const apiKey = ""; // The environment provides the key at runtime
 
         const PHONICS_DATA = {
             f: [
                 { word: 'fish', image: '🐟', audioText: 'F, f, fish' },
-                { word: 'fan', image: '🌬️', audioText: 'F, f, fan' },
+                { word: 'fan', image: '🪭', audioText: 'F, f, fan' },
                 { word: 'frog', image: '🐸', audioText: 'F, f, frog' },
                 { word: 'leaf', image: '🍃', audioText: 'Leaf' },
             ],
@@ -83,51 +83,65 @@
             const [currentGameIndex, setCurrentGameIndex] = useState(0);
             const [shuffledGameWords, setShuffledGameWords] = useState([]);
             
-            // Firebase & System State
             const [db, setDb] = useState(null);
             const [user, setUser] = useState(null);
-            const [debugMsg, setDebugMsg] = useState("正在啟動系統...");
-            const [isAudioLoading, setIsAudioLoading] = useState(null); // word string
+            const [debugMsg, setDebugMsg] = useState("系統初始化中...");
+            const [isAudioLoading, setIsAudioLoading] = useState(null);
 
-            // --- 1. Firebase Initialization (Polling) ---
+            // --- 1. Firebase Initialization ---
             useEffect(() => {
-                const checkFB = setInterval(() => {
+                const interval = setInterval(() => {
                     if (window.FB) {
-                        clearInterval(checkFB);
+                        clearInterval(interval);
                         initFirebase();
                     }
                 }, 500);
-                return () => clearInterval(checkFB);
+                return () => clearInterval(interval);
             }, []);
 
             const initFirebase = async () => {
                 try {
-                    const { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, getFirestore } = window.FB;
+                    const { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, getFirestore, signInWithCustomToken } = window.FB;
                     const app = initializeApp(firebaseConfig);
                     const auth = getAuth(app);
                     const firestore = getFirestore(app);
                     setDb(firestore);
 
+                    // Robust Auth Flow: Try Custom Token, then Anonymous
+                    const attemptLogin = async () => {
+                        try {
+                            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                                setDebugMsg("🔑 嘗試使用 Token 登入...");
+                                await signInWithCustomToken(auth, __initial_auth_token);
+                            } else {
+                                await signInAnonymously(auth);
+                            }
+                        } catch (e) {
+                            console.warn("Auth token error, switching to anonymous:", e.message);
+                            setDebugMsg("⚠️ Token 不匹配，切換至匿名模式...");
+                            await signInAnonymously(auth);
+                        }
+                    };
+
+                    await attemptLogin();
+
                     onAuthStateChanged(auth, (u) => {
                         if (u) {
                             setUser(u);
-                            setDebugMsg(`✅ 雲端連線成功: ${u.uid}`);
-                        } else {
-                            signInAnonymously(auth);
+                            setDebugMsg(`✅ 已連線: ${u.uid}`);
                         }
                     });
                 } catch (err) {
-                    setDebugMsg(`❌ Firebase 初始化失敗: ${err.message}`);
+                    setDebugMsg(`❌ 初始化錯誤: ${err.message}`);
                 }
             };
 
-            // --- 2. Helper: Safe ID Encoding ---
             const getSafeId = (text) => btoa(unescape(encodeURIComponent(text))).replace(/[/+=]/g, '_');
 
-            // --- 3. Audio Logic (Cache-First) ---
-            const playAudio = async (text) => {
+            // --- 2. Audio Service ---
+            const playAudio = async (text, retryCount = 0) => {
                 if (!db || !user) {
-                    setDebugMsg("⌛ 請等待雲端系統連線...");
+                    setDebugMsg("⌛ 等待雲端連線中...");
                     return;
                 }
 
@@ -136,8 +150,7 @@
                 const docRef = window.FB.doc(db, 'artifacts', APP_ID, 'public', 'data', 'audio_cache', safeId);
 
                 try {
-                    // (A) Check Cache
-                    setDebugMsg(`🔍 正在檢查快取: ${text}`);
+                    setDebugMsg(`🔍 檢查快取: ${text}`);
                     const cacheSnap = await window.FB.getDoc(docRef);
                     
                     let pcmBase64 = "";
@@ -146,19 +159,12 @@
                         setDebugMsg(`✅ 命中快取: ${text}`);
                         pcmBase64 = cacheSnap.data().pcmData;
                     } else {
-                        // (B) Generate via API if Cache Missing
-                        if (!API_KEY) {
-                            setDebugMsg("❌ 快取不存在且無 API Key，請先生成語音。");
-                            setIsAudioLoading(null);
-                            return;
-                        }
-
-                        setDebugMsg(`🔊 正在從 API 生成語音: ${text}`);
-                        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${API_KEY}`, {
+                        setDebugMsg(`🔊 生成新語音: ${text}`);
+                        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
-                                contents: [{ parts: [{ text: `Say clearly: ${text}` }] }],
+                                contents: [{ parts: [{ text: `Say in a clear, teacher-like voice: ${text}` }] }],
                                 generationConfig: {
                                     responseModalities: ["AUDIO"],
                                     speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } }
@@ -167,36 +173,46 @@
                             })
                         });
 
-                        const result = await response.json();
-                        pcmBase64 = result.candidates[0].content.parts[0].inlineData.data;
+                        if (!response.ok) {
+                            if (retryCount < 5) {
+                                const delay = Math.pow(2, retryCount) * 1000;
+                                setTimeout(() => playAudio(text, retryCount + 1), delay);
+                                return;
+                            }
+                            throw new Error("API 忙碌中");
+                        }
 
-                        // (C) Save to Cache
-                        await window.FB.setDoc(docRef, {
-                            word: text,
-                            pcmData: pcmBase64,
-                            createdAt: new Date().toISOString()
-                        });
-                        setDebugMsg(`💾 已儲存快取: ${text}`);
+                        const result = await response.json();
+                        pcmBase64 = result.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+
+                        if (pcmBase64) {
+                            await window.FB.setDoc(docRef, {
+                                word: text,
+                                pcmData: pcmBase64,
+                                createdAt: new Date().toISOString()
+                            });
+                            setDebugMsg(`💾 已快取新語音: ${text}`);
+                        }
                     }
 
-                    // Play Audio
-                    const audioBlob = pcmToWav(pcmBase64, 24000);
-                    const url = URL.createObjectURL(audioBlob);
-                    const audio = new Audio(url);
-                    audio.onended = () => setIsAudioLoading(null);
-                    audio.play();
+                    if (pcmBase64) {
+                        const audioBlob = pcmToWav(pcmBase64, 24000);
+                        const url = URL.createObjectURL(audioBlob);
+                        const audio = new Audio(url);
+                        audio.onended = () => setIsAudioLoading(null);
+                        audio.play();
+                    }
 
                 } catch (err) {
-                    setDebugMsg(`❌ 語音播放錯誤: ${err.message}`);
+                    setDebugMsg(`❌ 錯誤: ${err.message}`);
                     setIsAudioLoading(null);
                 }
             };
 
             const pcmToWav = (base64Pcm, sampleRate) => {
                 const binaryString = window.atob(base64Pcm);
-                const len = binaryString.length;
-                const bytes = new Uint8Array(len);
-                for (let i = 0; i < len; i++) bytes[i] = binaryString.charCodeAt(i);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
                 const buffer = new ArrayBuffer(44 + bytes.length);
                 const view = new DataView(buffer);
                 const writeString = (offset, string) => {
@@ -215,12 +231,11 @@
                 view.setUint16(34, 16, true);
                 writeString(36, 'data');
                 view.setUint32(40, bytes.length, true);
-                const pcmData = new Uint8Array(buffer, 44);
-                pcmData.set(bytes);
+                new Uint8Array(buffer, 44).set(bytes);
                 return new Blob([buffer], { type: 'audio/wav' });
             };
 
-            // --- 4. Game Logic ---
+            // --- 3. View Logic ---
             const startMixedGame = () => {
                 const all = [
                     ...PHONICS_DATA.f.map(w => ({...w, type: 'f'})),
@@ -231,57 +246,33 @@
                 setScore(0);
                 setCurrentGameIndex(0);
                 setCurrentStep('game');
-                playAudio("Let's start the challenge!");
-            };
-
-            const handleGameChoice = (type) => {
-                const current = shuffledGameWords[currentGameIndex];
-                if (type === current.type) {
-                    setScore(prev => prev + 10);
-                    setGameFeedback('correct');
-                    playAudio("Correct!");
-                } else {
-                    setGameFeedback('wrong');
-                    playAudio("Try again!");
-                }
-
-                setTimeout(() => {
-                    setGameFeedback(null);
-                    if (currentGameIndex < shuffledGameWords.length - 1) {
-                        setCurrentGameIndex(prev => prev + 1);
-                    } else {
-                        setCurrentStep('summary');
-                        playAudio(`Your final score is ${score + (type === current.type ? 10 : 0)}`);
-                    }
-                }, 1500);
+                playAudio("Ready? Go!");
             };
 
             // --- UI Screens ---
-
             const WelcomeScreen = () => (
                 <div className="flex flex-col items-center justify-center space-y-8 animate-fade-in py-12">
-                    <div className="text-8xl mb-4">🎨</div>
-                    <h1 className="text-5xl md:text-7xl font-black text-blue-600 text-center">
-                        The /f/ Phonics Lab
+                    <div className="text-8xl mb-4">🏫</div>
+                    <h1 className="text-5xl md:text-7xl font-black text-blue-600 text-center uppercase tracking-tight">
+                        Phonics Trio
                     </h1>
-                    <p className="text-xl text-slate-500 text-center max-w-lg">
-                        Learn 3 ways to spell the /f/ sound with Tr. Mimi!
+                    <p className="text-xl text-slate-500 text-center font-medium">
+                        Master the <span className="text-red-500 font-bold">/f/</span> sound with Tr. Mimi
                     </p>
                     <button 
-                        onClick={() => { setCurrentStep('menu'); playAudio("Choose a letter to start!"); }}
-                        className="px-12 py-5 bg-blue-500 text-white rounded-full text-2xl font-bold hover:bg-blue-600 transition-all shadow-xl hover:-translate-y-1"
+                        onClick={() => { setCurrentStep('menu'); playAudio("Welcome to class!"); }}
+                        className="px-14 py-6 bg-blue-500 text-white rounded-full text-2xl font-bold hover:bg-blue-600 transition-all shadow-xl hover:-translate-y-1 active:scale-95"
                     >
-                        Enter Lab 🚀
+                        Start Learning 🚀
                     </button>
                 </div>
             );
 
             const MenuScreen = () => (
                 <div className="w-full max-w-4xl mx-auto p-4 animate-zoom-in">
-                    <h2 className="text-4xl font-black text-center text-slate-800 mb-12 flex items-center justify-center gap-3">
-                        <i className="lucide-layout-grid text-blue-500"></i> Lesson Directory
+                    <h2 className="text-4xl font-black text-center text-slate-800 mb-12 uppercase tracking-widest">
+                        Choose a Pattern
                     </h2>
-                    
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
                         {['f', 'ph', 'gh'].map((type) => (
                             <button
@@ -289,122 +280,96 @@
                                 onClick={() => {
                                     setSelectedCategory(type);
                                     setCurrentStep('list');
-                                    playAudio(`The letters ${type} make the f sound.`);
+                                    playAudio(`The letter pattern ${type}.`);
                                 }}
-                                className="group bg-white p-10 rounded-3xl shadow-lg border-4 border-transparent hover:border-blue-400 transition-all transform hover:-translate-y-2 flex flex-col items-center"
+                                className="group bg-white p-12 rounded-[40px] shadow-lg border-4 border-transparent hover:border-blue-400 transition-all flex flex-col items-center"
                             >
-                                <div className={`text-7xl font-black mb-4 group-hover:scale-110 transition-transform ${
+                                <div className={`text-8xl font-black mb-4 group-hover:scale-110 transition-transform ${
                                     type === 'f' ? 'text-orange-500' : type === 'ph' ? 'text-purple-500' : 'text-green-500'
                                 }`}>{type}</div>
-                                <div className="text-slate-400 font-bold uppercase tracking-widest text-sm">Pattern</div>
+                                <div className="text-slate-400 font-bold tracking-widest text-xs">PRACTICE</div>
                             </button>
                         ))}
                     </div>
-
                     <div className="flex justify-center">
-                        <button 
-                            onClick={startMixedGame}
-                            className="px-12 py-5 bg-green-500 text-white rounded-full text-2xl font-bold hover:bg-green-600 flex items-center gap-3 shadow-lg transform hover:scale-105 transition-all animate-pulse"
-                        >
-                            <i className="lucide-gamepad-2"></i> Mixed Challenge!
+                        <button onClick={startMixedGame} className="px-12 py-5 bg-green-500 text-white rounded-full text-2xl font-bold hover:bg-green-600 flex items-center gap-3 shadow-lg animate-pulse">
+                            <i className="lucide-gamepad-2"></i> Play Mixed Game
                         </button>
                     </div>
                 </div>
             );
 
-            const WordListScreen = () => {
-                const data = PHONICS_DATA[selectedCategory];
-                return (
-                    <div className="w-full max-w-4xl mx-auto p-4 animate-fade-in">
-                        <div className="flex items-center justify-between mb-8">
-                            <button onClick={() => setCurrentStep('menu')} className="flex items-center gap-2 text-blue-600 font-bold hover:underline">
-                                <i className="lucide-arrow-left"></i> Back
-                            </button>
-                            <div className={`px-6 py-2 rounded-full font-black text-white text-xl ${
-                                selectedCategory === 'f' ? 'bg-orange-500' : selectedCategory === 'ph' ? 'bg-purple-500' : 'bg-green-500'
-                            }`}>
-                                {selectedCategory.toUpperCase()} Word Bank
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
-                            {data.map((item, idx) => (
-                                <div 
-                                    key={idx} 
-                                    className="bg-white p-8 rounded-3xl shadow-md border-2 border-slate-100 flex flex-col items-center hover:scale-105 transition-transform cursor-pointer group"
-                                    onClick={() => playAudio(item.word)}
-                                >
-                                    <div className="text-6xl mb-4 group-hover:rotate-12 transition-transform">{item.image}</div>
-                                    <div className="text-2xl font-black text-slate-800 capitalize">{item.word}</div>
-                                    {isAudioLoading === item.word && <span className="text-xs text-blue-400 mt-2 animate-pulse">🔊 Playing...</span>}
-                                </div>
-                            ))}
-                        </div>
-
-                        <div className="flex justify-center">
-                            <button 
-                                onClick={() => { setCurrentCardIndex(0); setCurrentStep('study'); }}
-                                className="px-10 py-5 bg-blue-500 text-white rounded-2xl text-xl font-bold hover:bg-blue-600 flex items-center gap-2 shadow-lg"
-                            >
-                                Practice Flashcards <i className="lucide-chevron-right"></i>
-                            </button>
+            const WordListScreen = () => (
+                <div className="w-full max-w-5xl mx-auto p-4 animate-fade-in">
+                    <div className="flex items-center justify-between mb-8">
+                        <button onClick={() => setCurrentStep('menu')} className="flex items-center gap-2 text-blue-600 font-bold hover:underline">
+                            <i className="lucide-arrow-left"></i> Back to Menu
+                        </button>
+                        <div className={`px-8 py-3 rounded-full font-black text-white text-2xl shadow-lg ${
+                            selectedCategory === 'f' ? 'bg-orange-500' : selectedCategory === 'ph' ? 'bg-purple-500' : 'bg-green-500'
+                        }`}>
+                            {selectedCategory?.toUpperCase()} Bank
                         </div>
                     </div>
-                );
-            };
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
+                        {PHONICS_DATA[selectedCategory].map((item, idx) => (
+                            <div key={idx} className="bg-white p-10 rounded-3xl shadow-sm border-2 border-slate-100 flex flex-col items-center hover:shadow-xl transition-all cursor-pointer group" onClick={() => playAudio(item.word)}>
+                                <div className="text-7xl mb-4 group-hover:scale-110 transition-transform">{item.image}</div>
+                                <div className="text-3xl font-black text-slate-800 capitalize">{item.word}</div>
+                                {isAudioLoading === item.word && <div className="w-4 h-4 bg-blue-500 rounded-full animate-ping mt-2"></div>}
+                            </div>
+                        ))}
+                    </div>
+                    <div className="flex justify-center">
+                        <button onClick={() => { setCurrentCardIndex(0); setCurrentStep('study'); }} className="px-12 py-5 bg-blue-500 text-white rounded-2xl text-xl font-bold hover:bg-blue-600 shadow-xl flex items-center gap-2">
+                            Step-by-Step Practice <i className="lucide-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+            );
 
             const StudyScreen = () => {
-                const data = PHONICS_DATA[selectedCategory];
-                const card = data[currentCardIndex];
+                const card = PHONICS_DATA[selectedCategory][currentCardIndex];
                 return (
                     <div className="w-full max-w-4xl mx-auto p-4 animate-slide-in">
                         <div className="flex items-center justify-between mb-8">
-                            <button onClick={() => setCurrentStep('list')} className="text-blue-600 font-bold hover:underline flex items-center gap-2">
-                                <i className="lucide-list"></i> Word Bank
+                            <button onClick={() => setCurrentStep('list')} className="text-blue-600 font-bold flex items-center gap-2 hover:underline">
+                                <i className="lucide-grid"></i> Word Bank
                             </button>
-                            <div className="text-slate-400 font-bold">{currentCardIndex + 1} / {data.length}</div>
+                            <span className="font-bold text-slate-400">Word {currentCardIndex + 1} of 4</span>
                         </div>
-
-                        <div className="bg-white rounded-[40px] shadow-2xl p-16 flex flex-col items-center justify-center min-h-[500px] border-b-8 border-slate-200">
-                            <div className="text-9xl mb-12 transform hover:scale-110 transition-transform cursor-pointer" onClick={() => playAudio(card.word)}>
+                        <div className="bg-white rounded-[60px] shadow-2xl p-20 flex flex-col items-center justify-center min-h-[550px] border-b-[12px] border-slate-200">
+                            <div className="text-[10rem] mb-12 transform hover:rotate-6 transition-transform cursor-pointer" onClick={() => playAudio(card.word)}>
                                 {card.image}
                             </div>
-                            <div className="text-8xl font-black tracking-widest mb-8 uppercase">
+                            <div className="text-[7rem] font-black tracking-widest mb-10 uppercase flex flex-wrap justify-center">
                                 {card.word.split('').map((char, idx) => {
                                     const word = card.word.toLowerCase();
                                     const type = selectedCategory;
                                     const startIdx = word.indexOf(type);
                                     const isHighlight = startIdx !== -1 && idx >= startIdx && idx < startIdx + type.length;
                                     return (
-                                        <span key={idx} className={isHighlight ? 'text-red-500 underline decoration-4 underline-offset-8' : 'text-slate-800'}>
+                                        <span key={idx} className={isHighlight ? 'text-red-500 underline underline-offset-[16px] decoration-8' : 'text-slate-800'}>
                                             {char}
                                         </span>
                                     );
                                 })}
                             </div>
-                            <button 
-                                onClick={() => playAudio(card.audioText)}
-                                className={`p-8 rounded-full transition-all shadow-inner ${isAudioLoading === card.audioText ? 'bg-blue-200 animate-pulse' : 'bg-blue-50 hover:bg-blue-100'}`}
-                            >
-                                <i className={`lucide-volume-2 text-blue-600 ${isAudioLoading === card.audioText ? 'animate-bounce' : ''}`} style={{width: 48, height: 48}}></i>
+                            <button onClick={() => playAudio(card.audioText)} className={`p-10 rounded-full shadow-inner transition-all ${isAudioLoading === card.audioText ? 'bg-blue-200 animate-pulse' : 'bg-blue-50 hover:bg-blue-100'}`}>
+                                <i className="lucide-volume-2 text-blue-600" style={{width: 64, height: 64}}></i>
                             </button>
                         </div>
-
-                        <div className="flex justify-between mt-10">
-                            <button 
-                                disabled={currentCardIndex === 0}
-                                onClick={() => setCurrentCardIndex(prev => prev - 1)}
-                                className="px-8 py-4 rounded-2xl bg-white border-2 border-slate-200 font-bold disabled:opacity-30 flex items-center gap-2"
-                            >
+                        <div className="flex justify-between mt-12">
+                            <button disabled={currentCardIndex === 0} onClick={() => setCurrentCardIndex(prev => prev - 1)} className="px-10 py-5 rounded-2xl bg-white border-2 border-slate-200 font-bold disabled:opacity-20 flex items-center gap-2">
                                 <i className="lucide-chevron-left"></i> Previous
                             </button>
-                            {currentCardIndex < data.length - 1 ? (
-                                <button onClick={() => setCurrentCardIndex(prev => prev + 1)} className="px-8 py-4 rounded-2xl bg-blue-500 text-white font-bold flex items-center gap-2">
-                                    Next <i className="lucide-chevron-right"></i>
+                            {currentCardIndex < 3 ? (
+                                <button onClick={() => setCurrentCardIndex(prev => prev + 1)} className="px-10 py-5 bg-blue-500 text-white rounded-2xl font-bold flex items-center gap-2 shadow-lg">
+                                    Next Word <i className="lucide-chevron-right"></i>
                                 </button>
                             ) : (
-                                <button onClick={() => setCurrentStep('menu')} className="px-8 py-4 rounded-2xl bg-green-500 text-white font-bold flex items-center gap-2">
-                                    Finish <i className="lucide-check"></i>
+                                <button onClick={() => setCurrentStep('menu')} className="px-10 py-5 bg-green-500 text-white rounded-2xl font-bold flex items-center gap-2 shadow-lg">
+                                    Finish Set <i className="lucide-check"></i>
                                 </button>
                             )}
                         </div>
@@ -413,40 +378,48 @@
             };
 
             const GameScreen = () => {
-                if (shuffledGameWords.length === 0) return null;
                 const word = shuffledGameWords[currentGameIndex];
+                if (!word) return null;
                 return (
                     <div className="w-full max-w-4xl mx-auto p-4 text-center animate-zoom-in">
                         <div className="flex justify-between items-center mb-10">
-                            <div className="bg-yellow-100 px-6 py-2 rounded-full font-bold text-yellow-700 flex items-center gap-2 border-2 border-yellow-200 shadow-sm">
-                                <i className="lucide-star fill-current text-yellow-500"></i> Score: {score}
+                            <div className="bg-yellow-100 px-8 py-3 rounded-full font-black text-yellow-700 flex items-center gap-3 border-2 border-yellow-200 shadow-md">
+                                <i className="lucide-star fill-current"></i> Score: {score}
                             </div>
-                            <div className="text-slate-400 font-bold">Progress: {currentGameIndex + 1}/{shuffledGameWords.length}</div>
+                            <div className="text-slate-400 font-bold text-xl uppercase tracking-widest">{currentGameIndex + 1} / 12</div>
                         </div>
-
-                        <div className={`relative bg-white rounded-[40px] shadow-xl p-20 mb-12 border-4 transition-all duration-300 ${
+                        <div className={`relative bg-white rounded-[60px] shadow-2xl p-24 mb-12 border-4 transition-all duration-300 ${
                             gameFeedback === 'correct' ? 'border-green-400 bg-green-50' : 
                             gameFeedback === 'wrong' ? 'border-red-400 bg-red-50' : 'border-slate-100'
                         }`}>
-                            <div className="text-9xl mb-8">{word.image}</div>
-                            <div className="text-7xl font-black text-slate-800 tracking-[0.5em] uppercase pl-4">
+                            <div className="text-[9rem] mb-10">{word.image}</div>
+                            <div className="text-8xl font-black text-slate-800 tracking-[0.4em] uppercase pl-8">
                                 {word.word.toLowerCase().replace(word.type, ' _ ')}
                             </div>
-                            
-                            {gameFeedback === 'correct' && <div className="absolute top-8 right-8 text-7xl animate-bounce">✅</div>}
-                            {gameFeedback === 'wrong' && <div className="absolute top-8 right-8 text-7xl animate-shake">❌</div>}
+                            {gameFeedback === 'correct' && <div className="absolute top-10 right-10 text-[6rem] animate-bounce">🏆</div>}
+                            {gameFeedback === 'wrong' && <div className="absolute top-10 right-10 text-[6rem] animate-shake">💥</div>}
                         </div>
-
-                        <div className="grid grid-cols-3 gap-8">
+                        <div className="grid grid-cols-3 gap-10">
                             {['f', 'ph', 'gh'].map((type) => (
                                 <button
                                     key={type}
-                                    onClick={() => handleGameChoice(type)}
+                                    onClick={() => {
+                                        const current = shuffledGameWords[currentGameIndex];
+                                        const isCorrect = type === current.type;
+                                        setScore(prev => isCorrect ? prev + 10 : prev);
+                                        setGameFeedback(isCorrect ? 'correct' : 'wrong');
+                                        playAudio(isCorrect ? "Correct!" : "Try again!");
+                                        setTimeout(() => {
+                                            setGameFeedback(null);
+                                            if (currentGameIndex < 11) setCurrentGameIndex(prev => prev + 1);
+                                            else setCurrentStep('summary');
+                                        }, 1500);
+                                    }}
                                     disabled={!!gameFeedback}
-                                    className={`py-10 rounded-3xl text-5xl font-black shadow-lg transition-all transform hover:-translate-y-2 active:scale-95 ${
-                                        type === 'f' ? 'bg-orange-100 text-orange-600 hover:bg-orange-200' :
-                                        type === 'ph' ? 'bg-purple-100 text-purple-600 hover:bg-purple-200' :
-                                        'bg-green-100 text-green-600 hover:bg-green-200'
+                                    className={`py-12 rounded-[40px] text-7xl font-black shadow-xl transition-all transform hover:-translate-y-2 active:scale-95 ${
+                                        type === 'f' ? 'bg-orange-100 text-orange-600' :
+                                        type === 'ph' ? 'bg-purple-100 text-purple-600' :
+                                        'bg-green-100 text-green-600'
                                     }`}
                                 >
                                     {type}
@@ -458,34 +431,34 @@
             };
 
             const SummaryScreen = () => (
-                <div className="flex flex-col items-center justify-center space-y-10 animate-zoom-in py-12">
-                    <div className="text-9xl animate-bounce">🏆</div>
-                    <h1 className="text-6xl font-black text-blue-600 text-center">Fantastic!</h1>
-                    <p className="text-3xl font-bold text-slate-600">Final Score: {score} / 120</p>
-                    <button 
-                        onClick={() => setCurrentStep('menu')}
-                        className="px-12 py-5 bg-blue-500 text-white rounded-full text-2xl font-bold hover:bg-blue-600 flex items-center gap-3 shadow-xl transform hover:scale-105 transition-all"
-                    >
-                        <i className="lucide-refresh-cw"></i> Try Again
+                <div className="flex flex-col items-center justify-center space-y-12 animate-zoom-in py-12">
+                    <div className="text-[12rem] animate-bounce">🌟</div>
+                    <h1 className="text-7xl font-black text-blue-600 text-center uppercase tracking-tighter italic">Wonderful!</h1>
+                    <div className="text-4xl font-bold text-slate-500 bg-white px-10 py-5 rounded-full shadow-lg">
+                        Final Score: {score} / 120
+                    </div>
+                    <button onClick={() => setCurrentStep('menu')} className="px-16 py-7 bg-blue-500 text-white rounded-full text-3xl font-bold hover:bg-blue-600 transition-all shadow-2xl flex items-center gap-4">
+                        <i className="lucide-refresh-ccw"></i> Play Again
                     </button>
                 </div>
             );
 
             return (
-                <div className="min-h-screen pb-20">
-                    <nav className="fixed top-0 left-0 w-full p-6 bg-white/90 backdrop-blur-md border-b-2 border-slate-100 z-50 flex justify-between items-center shadow-sm">
-                        <div className="flex items-center gap-3 font-black text-2xl text-blue-600 cursor-pointer" onClick={() => setCurrentStep('welcome')}>
-                            <div className="bg-blue-600 text-white p-2 rounded-lg">
+                <div className="min-h-screen pb-24">
+                    <nav className="fixed top-0 left-0 w-full p-8 bg-white/90 backdrop-blur-xl border-b-2 border-slate-100 z-50 flex justify-between items-center shadow-sm">
+                        <div className="flex items-center gap-4 font-black text-3xl text-blue-600 cursor-pointer" onClick={() => setCurrentStep('welcome')}>
+                            <div className="bg-blue-600 text-white p-3 rounded-2xl shadow-lg">
                                 <i className="lucide-graduation-cap"></i>
                             </div>
-                            <span>TR. MIMI'S LAB</span>
+                            <span className="tracking-tighter">PHONICS LAB</span>
                         </div>
-                        <div className="flex gap-2">
-                            {user ? <span className="text-xs font-bold text-green-500 bg-green-50 px-3 py-1 rounded-full border border-green-200">● Cloud Connected</span> : <span className="text-xs font-bold text-slate-400">● Offline</span>}
+                        <div className="flex items-center gap-3">
+                            <span className={`w-3 h-3 rounded-full ${user ? 'bg-green-500 animate-pulse' : 'bg-slate-300'}`}></span>
+                            <span className="text-sm font-black text-slate-400 uppercase tracking-widest">{user ? 'Online' : 'Connecting'}</span>
                         </div>
                     </nav>
 
-                    <main className="mt-28 flex flex-col items-center">
+                    <main className="mt-36 flex flex-col items-center px-6">
                         {currentStep === 'welcome' && <WelcomeScreen />}
                         {currentStep === 'menu' && <MenuScreen />}
                         {currentStep === 'list' && <WordListScreen />}
@@ -494,15 +467,12 @@
                         {currentStep === 'summary' && <SummaryScreen />}
                     </main>
 
-                    {/* Debug Bar */}
-                    <div className="fixed bottom-0 left-0 w-full bg-slate-900 text-slate-300 text-[10px] px-4 py-1 flex justify-between items-center font-mono opacity-80 hover:opacity-100 transition-opacity z-[100]">
-                        <div className="flex gap-4">
-                            <span>ID: {APP_ID}</span>
-                            <span className={debugMsg.includes('❌') ? 'text-red-400 font-bold' : ''}>{debugMsg}</span>
+                    <div className="fixed bottom-0 left-0 w-full bg-slate-900 text-slate-400 text-[11px] px-6 py-2 flex justify-between items-center font-mono opacity-90 z-[100] border-t border-slate-800">
+                        <div className="flex gap-6 uppercase">
+                            <span className="text-blue-400 font-bold">App: {APP_ID}</span>
+                            <span className={debugMsg.includes('❌') ? 'text-red-500 font-bold' : 'text-slate-300'}>{debugMsg}</span>
                         </div>
-                        <div className="flex gap-2">
-                            <span>UID: {user?.uid || 'guest'}</span>
-                        </div>
+                        <div className="hidden md:block">User: {user?.uid || 'anonymous'}</div>
                     </div>
                 </div>
             );
