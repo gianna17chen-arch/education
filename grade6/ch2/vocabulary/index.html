@@ -1,74 +1,45 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>小學四年級：活力單字學習營</title>
-    <!-- CDN 載入 React, Babel, Tailwind -->
+    <title>海賊王：職業句型大挑戰 - Architect Edition</title>
+    <!-- CDN 載入核心依賴 -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=Quicksand:wght@500;700&display=swap');
-        
-        body {
-            font-family: 'Quicksand', 'Noto Sans TC', sans-serif;
-            background-color: #fef3c7; /* 淺黃色背景 */
-            background-image: radial-gradient(#fbbf24 0.5px, transparent 0.5px);
-            background-size: 20px 20px;
-        }
-
-        .wood-texture {
-            background-color: #92400e;
-            background-image: linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px);
-            background-size: 100% 4px;
-            border: 4px solid #78350f;
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.3), 0 4px 6px rgba(0,0,0,0.1);
-        }
-
-        .card-hover:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-        }
-
-        .btn-sunny {
-            background: linear-gradient(135deg, #fbbf24, #f59e0b);
-            color: white;
-            transition: all 0.2s;
-        }
-        
-        .btn-sunny:hover {
-            background: linear-gradient(135deg, #f59e0b, #d97706);
-            transform: scale(1.05);
-        }
-
-        .debug-bar {
-            background: rgba(0, 0, 0, 0.8);
-            color: #10b981;
-            font-family: monospace;
-            font-size: 12px;
-            z-index: 9999;
-        }
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap');
+        body { font-family: 'Noto Sans TC', sans-serif; background-color: #01579b; }
+        .parchment { background: radial-gradient(#f5e6be 70%, #e2d1a3 100%); }
+        .debug-bar { font-family: monospace; font-size: 11px; transition: all 0.3s; }
+        .progress-bar { transition: width 0.3s ease-in-out; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .animate-pulse-slow { animation: pulse 2s infinite; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fadeIn { animation: fadeIn 0.5s ease-out forwards; }
     </style>
 </head>
-<body>
+<body class="min-h-screen flex items-center justify-center p-2 sm:p-4">
+
     <div id="root"></div>
 
-    <!-- Firebase SDK 載入 (核心規則：必須在 root 之後、Babel 之前) -->
+    <!-- Firebase SDK 載入 (獨立 Script Module) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
-        // 掛載到全局 window.FB
-        window.FB = { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, getFirestore, doc, getDoc, setDoc, collection };
+        window.FB = { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, getFirestore, doc, getDoc, setDoc, collection };
     </script>
 
-    <!-- React 邏輯 -->
-    <script type="text/babel" data-type="module">
-        const { useState, useEffect, useMemo } = React;
+    <!-- React 邏輯處理區 -->
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
 
+        // 核心配置
+        const themeId = "grade4-phonics-onepiece-pro";
         const firebaseConfig = {
             apiKey: "AIzaSyBnjfbh1ow4j6gXBP9XeBQkCt_cs7Uv3ds",
             authDomain: "education-b38d5.firebaseapp.com",
@@ -78,330 +49,405 @@
             appId: "1:450320441540:web:888014b1380a473a142991",
             measurementId: "G-70DQ70W0B8"
         };
+        const apiKey = ""; // 環境自動注入
 
-        const appId = "vocab-explorer-g4-v1";
+        // --- 子組件: SVG 圖標 ---
+        const Icons = {
+            Play: () => <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>,
+            Check: () => <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>,
+            Loading: () => <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>,
+            Sparkles: () => <svg className="w-6 h-6 text-yellow-500" fill="currentColor" viewBox="0 0 24 24"><path d="M9 11.3l.46.1.7-.7.1.46L11 11l-.46-.1-.7.7-.1-.46L9 11.3zM19 1l-1.26 2.74L15 5l2.74 1.26L19 9l1.26-2.74L23 5l-2.74-1.26L19 1zM9 4L7.5 7.5 4 9l3.5 1.5L9 14l1.5-3.5L14 9l-3.5-1.5L9 4zm8.5 8.5L16 16l-1.5-3.5L11 11l3.5-1.5L16 6l1.5 3.5L21 11l-3.5 1.5z"/></svg>,
+            Star: () => <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+        };
 
-        // 資料定義
-        const VOCABULARY = [
-            { id: 'v1', word: 'desk', chinese: '書桌', icon: '📖' },
-            { id: 'v2', word: 'chair', chinese: '椅子', icon: '🪑' },
-            { id: 'v3', word: 'in', chinese: '在...裡面', icon: '📥' },
-            { id: 'v4', word: 'on', chinese: '在...上面', icon: '🔝' },
-            { id: 'v5', word: 'under', chinese: '在...下面', icon: '⬇️' },
-            { id: 'v6', word: 'yo-yos', chinese: '溜溜球', icon: '🪀' },
-            { id: 'v7', word: 'kites', chinese: '風箏', icon: '🪁' },
-            { id: 'v8', word: 'dolls', chinese: '洋娃娃', icon: '🎎' },
-            { id: 'v9', word: 'balls', chinese: '球', icon: '⚽' },
-            { id: 'v10', word: 'robots', chinese: '機器人', icon: '🤖' }
-        ];
-
-        const SENTENCES = [
-            { id: 's1', eng: "Where's the kite?", chi: "風箏在哪裡？" },
-            { id: 's2', eng: "It's in the box.", chi: "它在盒子裡。" },
-            { id: 's3', eng: "Where are the dolls?", chi: "洋娃娃在哪裡？" },
-            { id: 's4', eng: "They're on the chair.", chi: "它們在椅子上。" }
-        ];
-
+        // --- 核心應用程式 ---
         function App() {
-            const [activeTab, setActiveTab] = useState('words'); // words, sentences, quiz
-            const [debugMsg, setDebugMsg] = useState('系統啟動中...');
             const [db, setDb] = useState(null);
             const [user, setUser] = useState(null);
-            const [cacheStatus, setCacheStatus] = useState({}); // { [safeId]: boolean }
-            const [loadingId, setLoadingId] = useState(null);
-            
-            // 測驗狀態
-            const [quizIndex, setQuizIndex] = useState(0);
-            const [score, setScore] = useState(0);
-            const [quizFinished, setQuizFinished] = useState(false);
+            const [debugMsg, setDebugMsg] = useState("⌛ 正在初始化系統核心...");
+            const [isReady, setIsReady] = useState(false);
+            const [view, setView] = useState('home');
+            const [currentStep, setCurrentStep] = useState(0);
+            const [batchProgress, setBatchProgress] = useState({ total: 0, current: 0, active: false });
+            const [scrambleResult, setScrambleResult] = useState([]);
+            const [dictInput, setDictInput] = useState("");
+            const [cacheStats, setCacheStats] = useState({});
 
-            // 下載進度狀態
-            const [downloadProgress, setDownloadProgress] = useState({ total: 0, current: 0, downloading: false });
+            // 資料定義
+            const gameData = [
+                { id: "map-1", type: 'map', q: 'Find "the USA"', correct: 'USA' },
+                { id: "diag-1", type: 'dialogue', char: 'Luffy', q: 'What do you want to be?', ans: 'I want to be a police officer.', hint: 'Police Officer', opts: ['I want to be a police officer.', 'I want to be a farmer.', 'I want to be a singer.'] },
+                { id: "diag-2", type: 'dialogue', char: 'Zoro', q: 'Do you want to be a writer?', ans: 'Yes, I do.', hint: 'Writer', opts: ['Yes, I do.', "No, I don't. I want to be a dentist."] },
+                { id: "diag-3", type: 'dialogue', char: 'Sanji', q: 'Do you want to be a bus driver?', ans: "No, I don't. I want to be a basketball player.", hint: 'Basketball Player', opts: ['Yes, I do.', "No, I don't. I want to be a basketball player."] },
+                { id: "diag-4", type: 'dialogue', char: 'Robin', q: 'What do you want to be?', ans: 'I want to be a singer.', hint: 'Singer', opts: ['I want to be a singer.', 'I want to be an artist.', 'I want to be a bus driver.'] },
+                { id: "diag-5", type: 'dialogue', char: 'Chopper', q: 'Do you want to be a farmer?', ans: 'Yes, I do.', hint: 'Farmer', opts: ['Yes, I do.', "No, I don't. I want to be a writer."] },
+                { id: "scramble-1", type: 'scramble', char: 'Nami', q: 'Rearrange the sentence:', words: ['I', 'want', 'to', 'be', 'a', 'writer.'], ans: 'I want to be a writer.' },
+                { id: "scramble-2", type: 'scramble', char: 'Usopp', q: 'Rearrange the sentence:', words: ['Do', 'you', 'want', 'to', 'be', 'a', 'singer?'], ans: 'Do you want to be a singer?' },
+                { id: "dict-1", type: 'dictation', char: 'Brook', q: 'Listen and type:', voice: 'I want to be a bus driver.', ans: 'bus driver' }
+            ];
 
-            // 1. Firebase 初始化
+            // 1. Firebase 初始化 (具備 Auth Fallover 機制)
             useEffect(() => {
-                const timer = setInterval(() => {
+                const interval = setInterval(() => {
                     if (window.FB) {
-                        clearInterval(timer);
-                        try {
-                            const app = window.FB.initializeApp(firebaseConfig);
-                            const _db = window.FB.getFirestore(app);
-                            const auth = window.FB.getAuth(app);
-                            setDb(_db);
-                            
-                            window.FB.signInAnonymously(auth)
-                                .then(cred => {
-                                    setUser(cred.user);
-                                    setDebugMsg(`✅ 連線成功 (UID: ${cred.user.uid.substring(0,8)}...)`);
-                                })
-                                .catch(err => setDebugMsg(`❌ 登入失敗: ${err.message}`));
-                        } catch (e) {
-                            setDebugMsg(`❌ 初始化錯誤: ${e.message}`);
-                        }
+                        clearInterval(interval);
+                        initFirebase();
                     }
                 }, 500);
-                return () => clearInterval(timer);
+                return () => clearInterval(interval);
             }, []);
 
-            // 2. Safe ID 與 雲端快取邏輯
-            const getSafeId = (text) => btoa(unescape(encodeURIComponent(text))).replace(/[/+=]/g, '_');
-
-            const handleDownloadAll = async () => {
-                if (!db || !user) {
-                    setDebugMsg("⌛ 系統尚未就緒，請稍候...");
-                    return;
-                }
-
-                // 收集所有需要發音的文本 (單字 + 例句)
-                const allTexts = [
-                    ...VOCABULARY.map(v => v.word),
-                    ...SENTENCES.map(s => s.eng)
-                ];
-
-                setDownloadProgress({ total: allTexts.length, current: 0, downloading: true });
-
-                let currentCount = 0;
-                for (const text of allTexts) {
-                    const safeId = getSafeId(text);
-                    
-                    // 如果本地狀態已經顯示快取存在，則跳過
-                    if (cacheStatus[text]) {
-                        currentCount++;
-                        setDownloadProgress(prev => ({ ...prev, current: currentCount }));
-                        continue;
-                    }
-
-                    setLoadingId(text);
-                    setDebugMsg(`📥 正在同步: ${text}...`);
-
-                    try {
-                        const cacheRef = window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'speech_cache', safeId);
-                        const cacheSnap = await window.FB.getDoc(cacheRef);
-
-                        if (cacheSnap.exists()) {
-                            setCacheStatus(prev => ({ ...prev, [text]: true }));
-                        } else {
-                            // 若無快取，寫入 Firebase 進行模擬生成/儲存
-                            await window.FB.setDoc(cacheRef, {
-                                text,
-                                createdAt: new Date().toISOString(),
-                                type: 'audio_meta'
-                            });
-                            setCacheStatus(prev => ({ ...prev, [text]: true }));
-                            // 加入短暫延遲，避免寫入過快觸發節流限制
-                            await new Promise(resolve => setTimeout(resolve, 300));
-                        }
-                    } catch (err) {
-                        setDebugMsg(`❌ 同步錯誤 (${text}): ${err.message}`);
-                    }
-
-                    currentCount++;
-                    setDownloadProgress(prev => ({ ...prev, current: currentCount }));
-                }
-
-                setLoadingId(null);
-                setDownloadProgress(prev => ({ ...prev, downloading: false }));
-                setDebugMsg("✅ 所有語音資料已成功同步至雲端！");
-            };
-
-            const handleSpeech = async (text) => {
-                if (!db || !user) {
-                    setDebugMsg("⌛ 系統尚未就緒，請稍候...");
-                    return;
-                }
-
-                const safeId = getSafeId(text);
-                setLoadingId(text);
-                setDebugMsg(`🔍 檢查快取: ${text}...`);
-
+            const initFirebase = async () => {
                 try {
-                    // 快取讀取優先邏輯
-                    const cacheRef = window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'speech_cache', safeId);
-                    const cacheSnap = await window.FB.getDoc(cacheRef);
+                    const app = window.FB.initializeApp(firebaseConfig);
+                    const auth = window.FB.getAuth(app);
+                    const firestore = window.FB.getFirestore(app);
+                    setDb(firestore);
 
-                    if (cacheSnap.exists()) {
-                        setDebugMsg(`✅ 快取命中: ${text}`);
-                        setCacheStatus(prev => ({ ...prev, [text]: true }));
-                        // 此處模擬語音播放 (若有真實語音生成 API 可整合於此)
-                        const synth = window.speechSynthesis;
-                        const utter = new SpeechSynthesisUtterance(text);
-                        utter.lang = 'en-US';
-                        synth.speak(utter);
-                    } else {
-                        setDebugMsg(`⚠️ 快取不存在，正在模擬生成並儲存...`);
-                        // 模擬 API 節流與快取儲存
-                        await window.FB.setDoc(cacheRef, {
-                            text,
-                            createdAt: new Date().toISOString(),
-                            type: 'audio_meta'
-                        });
-                        setCacheStatus(prev => ({ ...prev, [text]: true }));
-                        const synth = window.speechSynthesis;
-                        const utter = new SpeechSynthesisUtterance(text);
-                        utter.lang = 'en-US';
-                        synth.speak(utter);
-                    }
-                } catch (err) {
-                    setDebugMsg(`❌ 讀寫錯誤: ${err.message}`);
-                } finally {
-                    setLoadingId(null);
+                    // 實作 Fail-safe 登入邏輯
+                    const performLogin = async () => {
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            try {
+                                setDebugMsg("⌛ 嘗試 Custom Token 驗證...");
+                                await window.FB.signInWithCustomToken(auth, __initial_auth_token);
+                            } catch (tokenErr) {
+                                console.error("Custom Token Mismatch, falling back to anonymous:", tokenErr);
+                                setDebugMsg("⚠️ Token 不匹配，切換至匿名連線...");
+                                await window.FB.signInAnonymously(auth);
+                            }
+                        } else {
+                            setDebugMsg("⌛ 執行匿名登入...");
+                            await window.FB.signInAnonymously(auth);
+                        }
+                    };
+
+                    await performLogin();
+
+                    window.FB.onAuthStateChanged(auth, (u) => {
+                        if (u) {
+                            setUser(u);
+                            setIsReady(true);
+                            setDebugMsg(`✅ Firebase Ready | Theme: ${themeId} | UID: ${u.uid.substring(0,8)}`);
+                        }
+                    });
+                } catch (e) {
+                    setDebugMsg(`❌ Firebase 核心錯誤: ${e.message}`);
                 }
             };
 
-            // 3. UI 元件
-            const TabButton = ({ id, label, icon }) => (
-                <button 
-                    onClick={() => { setActiveTab(id); setQuizFinished(false); setQuizIndex(0); setScore(0); }}
-                    className={`flex-1 py-4 px-2 text-lg font-bold flex items-center justify-center gap-2 transition-all ${activeTab === id ? 'bg-amber-100 text-amber-900 border-b-4 border-amber-600' : 'bg-white text-gray-500'}`}
-                >
-                    <span>{icon}</span>{label}
-                </button>
-            );
+            // 2. 工具函式: SafeID & Exponential Backoff
+            const getSafeId = (text) => btoa(unescape(encodeURIComponent(text))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
-            // 測驗隨機選題
-            const currentQuiz = useMemo(() => {
-                const question = VOCABULARY[quizIndex % VOCABULARY.length];
-                const options = [question.chinese];
-                while(options.length < 3) {
-                    const randomWord = VOCABULARY[Math.floor(Math.random() * VOCABULARY.length)].chinese;
-                    if(!options.includes(randomWord)) options.push(randomWord);
+            const fetchWithRetry = async (url, options, retries = 5) => {
+                for (let i = 0; i < retries; i++) {
+                    try {
+                        const res = await fetch(url, options);
+                        if (res.ok) return await res.json();
+                        if (res.status === 403 && !apiKey) {
+                            setDebugMsg("❌ 無法取得 API 授權，請確保金鑰注入");
+                            throw new Error("Unauthorized");
+                        }
+                        throw new Error(`HTTP ${res.status}`);
+                    } catch (e) {
+                        if (i === retries - 1) throw e;
+                        await new Promise(r => setTimeout(r, Math.pow(2, i) * 1000));
+                    }
                 }
-                return { question: question.word, answer: question.chinese, options: options.sort(() => Math.random() - 0.5) };
-            }, [quizIndex]);
+            };
+
+            // 3. Audio Pipeline
+            const createWavFile = (pcmBase64, sampleRate) => {
+                const pcmData = Uint8Array.from(atob(pcmBase64), c => c.charCodeAt(0));
+                const buffer = new ArrayBuffer(44 + pcmData.length);
+                const view = new DataView(buffer);
+                const writeString = (o, s) => { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)); };
+                
+                writeString(0, 'RIFF');
+                view.setUint32(4, 36 + pcmData.length, true);
+                writeString(8, 'WAVE');
+                writeString(12, 'fmt ');
+                view.setUint32(16, 16, true);
+                view.setUint16(20, 1, true);
+                view.setUint16(22, 1, true);
+                view.setUint32(24, sampleRate, true);
+                view.setUint32(28, sampleRate * 2, true);
+                view.setUint16(32, 2, true);
+                view.setUint16(34, 16, true);
+                writeString(36, 'data');
+                view.setUint32(40, pcmData.length, true);
+                
+                const data = new Uint8Array(buffer);
+                data.set(pcmData, 44);
+                return URL.createObjectURL(new Blob([data], { type: 'audio/wav' }));
+            };
+
+            // 4. Image Pipeline
+            const compressImage = (base64) => {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        const width = 512;
+                        const height = (img.height / img.width) * width;
+                        canvas.width = width;
+                        canvas.height = height;
+                        ctx.drawImage(img, 0, 0, width, height);
+                        resolve(canvas.toDataURL('image/jpeg', 0.7));
+                    };
+                    img.src = `data:image/png;base64,${base64}`;
+                });
+            };
+
+            // 5. 雲端快取偵測與生成
+            const getOrGenerateMedia = async (type, text) => {
+                if (!isReady || !db) return null;
+                const safeId = getSafeId(text);
+                const docRef = window.FB.doc(db, 'artifacts', themeId, 'public', 'data', type, safeId);
+                
+                try {
+                    const snap = await window.FB.getDoc(docRef);
+                    if (snap.exists()) {
+                        setDebugMsg(`✅ Hit Cache: ${type}/${text.substring(0,8)}...`);
+                        return snap.data().payload;
+                    }
+
+                    if (type === 'audio') {
+                        const res = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                contents: [{ parts: [{ text }] }],
+                                generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } } },
+                                model: "gemini-2.5-flash-preview-tts"
+                            })
+                        });
+                        const inline = res.candidates[0].content.parts[0].inlineData;
+                        const rate = parseInt(inline.mimeType.match(/rate=(\d+)/)[1]);
+                        const payload = { audioData: inline.data, sampleRate: rate };
+                        await window.FB.setDoc(docRef, { payload, text, createdAt: Date.now() });
+                        return payload;
+                    } else {
+                        const res = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`, {
+                            method: 'POST',
+                            body: JSON.stringify({ instances: [{ prompt: `One Piece style drawing: ${text}` }], parameters: { sampleCount: 1 } })
+                        });
+                        const rawB64 = res.predictions[0].bytesBase64Encoded;
+                        const compressed = await compressImage(rawB64);
+                        await window.FB.setDoc(docRef, { payload: compressed, text, createdAt: Date.now() });
+                        return compressed;
+                    }
+                } catch (e) {
+                    setDebugMsg(`❌ Media Error: ${e.message}`);
+                    return null;
+                }
+            };
+
+            const runBatchGeneration = async () => {
+                setBatchProgress({ total: gameData.length, current: 0, active: true });
+                for (let i = 0; i < gameData.length; i++) {
+                    const step = gameData[i];
+                    if (step.ans) await getOrGenerateMedia('audio', step.ans);
+                    if (step.voice) await getOrGenerateMedia('audio', step.voice);
+                    if (step.hint) await getOrGenerateMedia('image', step.hint);
+                    setBatchProgress(prev => ({ ...prev, current: i + 1 }));
+                }
+                setBatchProgress(prev => ({ ...prev, active: false }));
+                setDebugMsg("✅ 預載資源完成！");
+            };
+
+            const speak = async (text) => {
+                const data = await getOrGenerateMedia('audio', text);
+                if (data && data.audioData) {
+                    const url = createWavFile(data.audioData, data.sampleRate);
+                    new Audio(url).play();
+                } else {
+                    const ut = new SpeechSynthesisUtterance(text);
+                    ut.lang = 'en-US';
+                    window.speechSynthesis.speak(ut);
+                }
+            };
+
+            const handleNext = () => {
+                if (currentStep < gameData.length - 1) {
+                    setCurrentStep(s => s + 1);
+                    setScrambleResult([]);
+                    setDictInput("");
+                } else {
+                    setView('success');
+                }
+            };
 
             return (
-                <div className="max-w-4xl mx-auto pb-20 pt-4 px-4 min-h-screen">
-                    {/* Header */}
-                    <div className="wood-texture rounded-t-3xl p-6 text-center text-white mb-0">
-                        <h1 className="text-3xl font-bold tracking-wider mb-2">🌳 英語活力學習營 🌳</h1>
-                        <p className="opacity-90">小學四年級 · 基礎單字與句型練習</p>
-                        
-                        {/* 一鍵下載/同步按鈕 */}
-                        <div className="mt-4 flex justify-center items-center flex-col h-12">
-                            {!downloadProgress.downloading ? (
-                                <button 
-                                    onClick={handleDownloadAll}
-                                    className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2 rounded-full text-sm font-bold transition-all border-2 border-emerald-800 shadow-sm hover:scale-105"
-                                >
-                                    <span>☁️</span> 一鍵雲端同步所有語音
-                                </button>
-                            ) : (
-                                <div className="w-64 max-w-full">
-                                    <div className="text-sm mb-1 flex justify-between font-bold text-emerald-100">
-                                        <span>同步中...</span>
-                                        <span>{Math.round((downloadProgress.current / downloadProgress.total) * 100)}%</span>
-                                    </div>
-                                    <div className="w-full bg-emerald-900 rounded-full h-2.5 border border-emerald-800">
-                                        <div className="bg-emerald-400 h-2.5 rounded-full transition-all duration-300" style={{ width: `${(downloadProgress.current / downloadProgress.total) * 100}%` }}></div>
-                                    </div>
-                                </div>
-                            )}
+                <div className="w-full max-w-4xl parchment border-[12px] border-stone-800 rounded-[3rem] shadow-2xl min-h-[600px] flex flex-col relative overflow-hidden">
+                    
+                    {batchProgress.active && (
+                        <div className="absolute top-0 left-0 right-0 h-2 bg-amber-200 z-50">
+                            <div className="h-full bg-blue-600 progress-bar shadow-[0_0_10px_#2563eb]" style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}></div>
                         </div>
-                    </div>
+                    )}
 
-                    {/* Navigation */}
-                    <div className="flex bg-white shadow-md mb-6 rounded-b-xl overflow-hidden">
-                        <TabButton id="words" label="單字牆" icon="🗂️" />
-                        <TabButton id="sentences" label="練習句" icon="💬" />
-                        <TabButton id="quiz" label="挑戰賽" icon="🏆" />
-                    </div>
-
-                    {/* Content Area */}
-                    <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-inner min-h-[400px]">
-                        
-                        {/* Tab: Words */}
-                        {activeTab === 'words' && (
-                            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                                {VOCABULARY.map(v => (
-                                    <div key={v.word} className="bg-white border-2 border-amber-200 rounded-xl p-4 text-center card-hover transition-all cursor-pointer relative" onClick={() => handleSpeech(v.word)}>
-                                        <div className="text-4xl mb-2">{v.icon}</div>
-                                        <div className="text-xl font-bold text-amber-900 lowercase">{v.word}</div>
-                                        <div className="text-gray-500 text-sm">{v.chinese}</div>
-                                        <div className="absolute top-2 right-2 text-xs">
-                                            {loadingId === v.word ? '⌛' : (cacheStatus[v.word] ? '✅' : '🔊')}
-                                        </div>
-                                    </div>
-                                ))}
+                    <main className="flex-1 p-6 flex flex-col items-center justify-center">
+                        {view === 'home' && (
+                            <div className="text-center animate-fadeIn">
+                                <div className="mb-6 flex justify-center"><Icons.Sparkles /></div>
+                                <h1 className="text-4xl sm:text-5xl font-bold text-amber-900 mb-4 tracking-tighter uppercase">⚓ One Piece Challenge ⚓</h1>
+                                <p className="text-amber-800 mb-10 font-bold">Welcome back, Tr. Mimi! ⚓🏴‍☠️</p>
+                                <div className="space-y-4 flex flex-col items-center">
+                                    <button onClick={() => setView('learning')} className="w-64 bg-orange-500 hover:bg-orange-600 text-white py-4 rounded-full text-2xl font-black shadow-xl transform transition hover:scale-110 active:scale-95">
+                                        START GAME
+                                    </button>
+                                    <button onClick={runBatchGeneration} disabled={batchProgress.active} className="w-64 bg-amber-800 text-white py-3 rounded-full font-bold flex items-center justify-center gap-2 hover:bg-amber-900 disabled:opacity-50">
+                                        {batchProgress.active ? <Icons.Loading /> : <Icons.Play />}
+                                        一鍵預載所有資源
+                                    </button>
+                                </div>
                             </div>
                         )}
 
-                        {/* Tab: Sentences */}
-                        {activeTab === 'sentences' && (
-                            <div className="space-y-4">
-                                {SENTENCES.map(s => (
-                                    <div key={s.id} className="bg-white border-l-8 border-orange-400 p-5 rounded-r-xl shadow-sm flex justify-between items-center group hover:bg-orange-50 transition-colors">
-                                        <div>
-                                            <div className="text-2xl font-bold text-gray-800 mb-1">{s.eng}</div>
-                                            <div className="text-gray-500">{s.chi}</div>
-                                        </div>
-                                        <button 
-                                            onClick={() => handleSpeech(s.eng)}
-                                            className="w-12 h-12 rounded-full btn-sunny flex items-center justify-center text-xl"
-                                        >
-                                            {loadingId === s.eng ? '⌛' : '🔊'}
+                        {view === 'learning' && (
+                            <div className="w-full h-full flex flex-col items-center">
+                                <h3 className="text-2xl font-bold text-amber-900 mb-6 border-b-4 border-amber-900 uppercase">Training Room</h3>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full">
+                                    {['police officer', 'basketball player', 'artist', 'dentist', 'bus driver', 'farmer', 'singer', 'writer'].map(w => (
+                                        <button key={w} onClick={() => speak(w)} className="group bg-white p-4 rounded-2xl border-2 border-amber-900 hover:bg-amber-100 transition-all flex flex-col items-center gap-2 relative shadow-md">
+                                            <span className="text-3xl grayscale group-hover:grayscale-0 transition">📦</span>
+                                            <span className="text-[10px] font-black uppercase text-center">{w}</span>
+                                            <div className="absolute top-2 right-2 opacity-30"><Icons.Play /></div>
                                         </button>
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
+                                <button onClick={() => setView('game')} className="mt-12 bg-stone-800 text-white px-10 py-3 rounded-full text-xl font-bold hover:bg-stone-900 shadow-xl transition-all hover:scale-105">
+                                    I'M READY!
+                                </button>
                             </div>
                         )}
 
-                        {/* Tab: Quiz */}
-                        {activeTab === 'quiz' && (
-                            <div className="flex flex-col items-center justify-center py-8">
-                                {!quizFinished ? (
-                                    <div className="w-full max-w-md">
-                                        <div className="text-center mb-8">
-                                            <div className="text-sm font-bold text-orange-500 uppercase tracking-widest mb-2">Question {quizIndex + 1} of 5</div>
-                                            <div className="text-5xl font-bold text-gray-800 p-8 bg-amber-50 rounded-3xl border-4 border-dashed border-amber-200">
-                                                {currentQuiz.question}
-                                            </div>
-                                        </div>
-                                        <div className="grid grid-cols-1 gap-4">
-                                            {currentQuiz.options.map((opt, i) => (
-                                                <button 
-                                                    key={i}
-                                                    onClick={() => {
-                                                        if(opt === currentQuiz.answer) setScore(s => s + 20);
-                                                        if(quizIndex < 4) {
-                                                            setQuizIndex(i => i + 1);
-                                                        } else {
-                                                            setQuizFinished(true);
-                                                        }
-                                                    }}
-                                                    className="w-full p-4 text-xl font-bold bg-white border-2 border-amber-200 rounded-2xl hover:bg-amber-500 hover:text-white hover:border-amber-500 transition-all"
-                                                >
-                                                    {opt}
-                                                </button>
+                        {view === 'game' && (
+                            <div className="w-full animate-fadeIn flex flex-col items-center">
+                                <header className="w-full flex justify-between items-center mb-6 border-b-2 border-stone-800 pb-2">
+                                    <span className="text-amber-900 font-black uppercase tracking-widest">{gameData[currentStep].type}</span>
+                                    <span className="bg-amber-900 text-white px-3 py-1 rounded-lg text-sm">{currentStep + 1} / {gameData.length}</span>
+                                </header>
+
+                                {gameData[currentStep].type === 'map' && (
+                                    <div className="w-full flex flex-col items-center">
+                                        <p className="text-xl font-bold text-stone-800 mb-6">Find the route to "the USA"!</p>
+                                        <div className="w-full h-[320px] bg-sky-200 rounded-2xl border-4 border-stone-800 relative overflow-hidden shadow-inner">
+                                            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/World_Map_Blank.svg/1200px-World_Map_Blank.svg.png" className="w-full h-full object-cover opacity-50" />
+                                            {[{n:'USA',x:'18%',y:'35%'},{n:'Spain',x:'46%',y:'34%'},{n:'Taiwan',x:'83%',y:'45%'}].map(m => (
+                                                <div key={m.n} onClick={() => {
+                                                    if(m.n === gameData[currentStep].correct) { setDebugMsg("✅ Perfect! USA!"); handleNext(); }
+                                                    else setDebugMsg(`❌ No, that's ${m.n}!`);
+                                                }} style={{left:m.x, top:m.y}} className="absolute cursor-pointer hover:scale-150 transition-transform">
+                                                    <div className="bg-orange-500 w-8 h-8 rounded-full border-2 border-white flex items-center justify-center text-white text-xs font-bold rotate-45 shadow-lg"><span>?</span></div>
+                                                </div>
                                             ))}
                                         </div>
                                     </div>
-                                ) : (
-                                    <div className="text-center animate-bounce">
-                                        <div className="text-6xl mb-4">🥳</div>
-                                        <h2 className="text-4xl font-bold text-amber-900 mb-2">挑戰完成!</h2>
-                                        <p className="text-2xl text-orange-600 mb-6">總得分：{score} 分</p>
-                                        <button 
-                                            onClick={() => { setQuizIndex(0); setScore(0); setQuizFinished(false); }}
-                                            className="px-8 py-3 btn-sunny rounded-full font-bold text-xl"
-                                        >
-                                            再玩一次
-                                        </button>
+                                )}
+
+                                {gameData[currentStep].type === 'dialogue' && (
+                                    <div className="w-full flex flex-col items-center">
+                                        <div className="bg-white p-8 rounded-[2rem] border-4 border-stone-800 shadow-xl w-full relative">
+                                            <div className="absolute -top-5 left-8 bg-yellow-400 border-4 border-stone-800 px-4 py-1 font-black text-stone-800 shadow-md">{gameData[currentStep].char}</div>
+                                            <div className="flex justify-end mb-4">
+                                                <button onClick={() => speak(gameData[currentStep].q)} className="bg-stone-100 p-2 rounded-lg hover:bg-stone-200 transition-colors"><Icons.Play /></button>
+                                            </div>
+                                            <p className="text-2xl font-black text-stone-800 mb-8 italic text-center">"{gameData[currentStep].q}"</p>
+                                            <div className="mb-10 p-6 bg-stone-50 rounded-xl border-2 border-dashed border-stone-300 flex items-center justify-center text-3xl font-black text-blue-900">
+                                                {gameData[currentStep].hint}
+                                            </div>
+                                            <div className="grid gap-3">
+                                                {gameData[currentStep].opts.map(opt => (
+                                                    <button key={opt} onClick={() => {
+                                                        if(opt === gameData[currentStep].ans) { speak(opt); handleNext(); }
+                                                        else setDebugMsg("❌ Not this one!");
+                                                    }} className="w-full text-left p-4 rounded-xl border-2 border-stone-800 hover:bg-yellow-50 font-bold transition-all active:translate-y-1 hover:border-orange-500">
+                                                        {opt}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {gameData[currentStep].type === 'scramble' && (
+                                    <div className="w-full flex flex-col items-center">
+                                        <div className="bg-white p-8 rounded-[2rem] border-4 border-stone-800 shadow-xl w-full">
+                                            <div className="flex items-center gap-3 mb-6">
+                                                <div className="bg-yellow-400 border-2 border-stone-800 px-3 py-1 font-black">{gameData[currentStep].char}</div>
+                                                <p className="font-bold">Rearrange the sentence:</p>
+                                            </div>
+                                            <div className="min-h-[80px] p-4 bg-stone-50 border-2 border-dashed border-stone-300 rounded-xl mb-6 flex flex-wrap gap-2 shadow-inner">
+                                                {scrambleResult.map((w, i) => (
+                                                    <span key={i} className="bg-amber-100 px-3 py-1 rounded-lg font-bold border border-amber-300 text-blue-900 shadow-sm">{w}</span>
+                                                ))}
+                                            </div>
+                                            <div className="flex flex-wrap gap-2 justify-center mb-10">
+                                                {gameData[currentStep].words.map((w, i) => (
+                                                    <button key={i} 
+                                                        disabled={scrambleResult.includes(w)}
+                                                        onClick={() => setScrambleResult([...scrambleResult, w])}
+                                                        className={`px-4 py-2 rounded-xl font-bold shadow-md transition-all ${scrambleResult.includes(w) ? 'bg-stone-100 text-stone-300' : 'bg-stone-800 text-white hover:bg-stone-700 active:translate-y-1'}`}>
+                                                        {w}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <div className="flex justify-center gap-4">
+                                                <button onClick={() => {
+                                                    if(scrambleResult.join(' ') === gameData[currentStep].ans) { speak(gameData[currentStep].ans); handleNext(); }
+                                                    else setDebugMsg("❌ Check the order!");
+                                                }} className="bg-green-600 text-white px-8 py-3 rounded-full font-black shadow-lg hover:bg-green-700">CHECK</button>
+                                                <button onClick={() => setScrambleResult([])} className="bg-stone-400 text-white px-8 py-3 rounded-full font-black hover:bg-stone-500">RESET</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {gameData[currentStep].type === 'dictation' && (
+                                    <div className="w-full flex flex-col items-center">
+                                        <div className="bg-white p-8 rounded-[2rem] border-4 border-stone-800 shadow-xl w-full text-center">
+                                            <p className="text-xl font-black mb-10">Listen to Brook and Type!</p>
+                                            <button onClick={() => speak(gameData[currentStep].voice)} className="text-8xl p-10 bg-amber-100 rounded-full hover:scale-110 transition-transform shadow-inner border border-amber-200 mb-10 text-stone-700">🔊</button>
+                                            <input 
+                                                type="text" 
+                                                value={dictInput}
+                                                onChange={(e) => setDictInput(e.target.value)}
+                                                className="w-full p-6 border-4 border-stone-800 rounded-2xl text-center text-3xl mb-10 focus:outline-none focus:ring-8 focus:ring-yellow-100"
+                                                placeholder="Listen then type..."
+                                            />
+                                            <button onClick={() => {
+                                                const input = dictInput.trim().toLowerCase().replace(/\.$/, "");
+                                                if(input === gameData[currentStep].ans || input === gameData[currentStep].voice.toLowerCase().replace(/\.$/, "")) { speak("Correct!"); handleNext(); }
+                                                else setDebugMsg("❌ Wrong spelling!");
+                                            }} className="w-full bg-green-600 text-white py-5 rounded-2xl text-2xl font-black shadow-xl hover:bg-green-700 transition-all">SUBMIT</button>
+                                        </div>
                                     </div>
                                 )}
                             </div>
                         )}
-                    </div>
 
-                    {/* Footer / DebugBar */}
-                    <div className="fixed bottom-0 left-0 w-full debug-bar p-2 flex justify-between items-center border-t border-emerald-900/50">
-                        <div className="truncate flex items-center gap-2">
-                            <span className="bg-emerald-900 px-2 py-0.5 rounded text-[10px] text-white">SYSTEM</span>
-                            {debugMsg}
+                        {view === 'success' && (
+                            <div className="text-center animate-fadeIn">
+                                <h1 className="text-4xl font-black text-amber-900 mb-6 uppercase">Mission Accomplished!</h1>
+                                <div className="text-9xl mb-10 animate-pulse-slow">🍖</div>
+                                <p className="text-xl text-amber-800 mb-12 font-bold italic px-10">"You are the Pirate King of English!"</p>
+                                <button onClick={() => window.location.reload()} className="bg-stone-800 text-white px-12 py-5 rounded-full text-2xl font-black shadow-2xl hover:bg-stone-900 transition-all hover:scale-110">PLAY AGAIN</button>
+                            </div>
+                        )}
+                    </main>
+
+                    <footer className="fixed bottom-0 left-0 right-0 h-8 bg-stone-950 text-white debug-bar px-4 flex items-center justify-between border-t border-stone-800 opacity-90 backdrop-blur-md">
+                        <div className="flex items-center gap-2">
+                            <span className={`w-2 h-2 rounded-full ${isReady ? 'bg-green-500 shadow-[0_0_5px_#22c55e]' : 'bg-red-500 animate-pulse'}`}></span>
+                            <span className="truncate max-w-[200px] sm:max-w-none">{debugMsg}</span>
                         </div>
-                        <div className="text-[10px] opacity-50 px-2">
-                            APP_ID: {appId}
+                        <div className="flex gap-4 text-[10px] sm:text-xs">
+                            <span className="text-stone-500 hidden sm:inline">Theme: {themeId}</span>
+                            <span className="text-stone-400">UID: {user ? user.uid.substring(0,8) : '---'}</span>
                         </div>
-                    </div>
+                    </footer>
                 </div>
             );
         }
