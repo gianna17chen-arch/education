@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Toy Workshop - 專業英語教學版</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;600;800&display=swap');
+        body { font-family: 'Lexend', sans-serif; }
+        .feedback-bounce { animation: bounce 0.5s infinite; }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(-5%); }
+            50% { transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-sky-50 min-h-screen">
+    <div id="root"></div>
+
+    <!-- Firebase SDK (Rule 1) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        window.FB = { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, getFirestore, doc, getDoc, setDoc, collection, onSnapshot };
+    </script>
+
+    <!-- React Application -->
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
+
+        // --- Configuration & Constants ---
+        const themeId = "toy-workshop-v1";
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'toy-english-game';
+        const apiKey = ""; // Provided by environment
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBnjfbh1ow4j6gXBP9XeBQkCt_cs7Uv3ds",
+            authDomain: "education-b38d5.firebaseapp.com",
+            projectId: "education-b38d5",
+            storageBucket: "education-b38d5.firebasestorage.app",
+            messagingSenderId: "450320441540",
+            appId: "1:450320441540:web:888014b1380a473a142991",
+            measurementId: "G-70DQ70W0B8"
+        };
+
+        const TOYS = [
+            { id: 'yo-yos', word: 'yo-yos', icon: '🪀' },
+            { id: 'kites', word: 'kites', icon: '🪁' },
+            { id: 'dolls', word: 'dolls', icon: '🪆' },
+            { id: 'balls', word: 'balls', icon: '⚽' },
+            { id: 'robots', word: 'robots', icon: '🤖' },
+            { id: 'balloons', word: 'balloons', icon: '🎈' },
+            { id: 'blocks', word: 'blocks', icon: '🧱' },
+            { id: 'toy cars', word: 'toy cars', icon: '🏎️' },
+            { id: 'puzzles', word: 'puzzles', icon: '🧩' },
+        ];
+
+        const QUESTIONS_MC = [
+            { id: 1, type: 'mc', question: 'What are these?', imagePrompt: 'Two cute robots on a table, 3d style', answer: "They're robots.", options: ["They're robots.", "They're dolls.", "They're balls."], hint: '近處的機器人' },
+            { id: 2, type: 'mc', question: 'What are those?', imagePrompt: 'Two colorful yo-yos hanging far away', answer: "They're yo-yos.", options: ["They're kites.", "They're yo-yos.", "They're blocks."], hint: '遠處的溜溜球' },
+            { id: 3, type: 'mc', question: 'What are these?', imagePrompt: 'Two flying kites in the sky nearby', answer: "They're kites.", options: ["They're puzzles.", "They're cars.", "They're kites."], hint: '近處的風箏' },
+            { id: 4, type: 'mc', question: 'What are those?', imagePrompt: 'Two soccer balls far on a field', answer: "They're balls.", options: ["They're balls.", "They're robots.", "They're dolls."], hint: '遠處的球' },
+            { id: 5, type: 'mc', question: 'What are these?', imagePrompt: 'Two colorful balloons near the viewer', answer: "They're balloons.", options: ["They're blocks.", "They're balloons.", "They're yo-yos."], hint: '近處的氣球' },
+            { id: 6, type: 'mc', question: 'What are those?', imagePrompt: 'Two toy cars racing in the distance', answer: "They're toy cars.", options: ["They're toy cars.", "They're puzzles.", "They're dolls."], hint: '遠處的玩具小車' },
+            { id: 7, type: 'mc', question: 'What are these?', imagePrompt: 'Two building blocks near the child', answer: "They're blocks.", options: ["They're balls.", "They're blocks.", "They're kites."], hint: '近處的積木' },
+            { id: 8, type: 'mc', question: 'What are those?', imagePrompt: 'Two puzzles pieces far on the floor', answer: "They're puzzles.", options: ["They're yo-yos.", "They're robots.", "They're puzzles."], hint: '遠處的拼圖' },
+        ];
+
+        const QUESTIONS_FIB = [
+            { id: 9, type: 'fib', sentence: 'What are _____? (近處)', blank: 'these', full: 'What are these?', hint: '近處用 these' },
+            { id: 10, type: 'fib', sentence: 'What are _____? (遠處)', blank: 'those', full: 'What are those?', hint: '遠處用 those' },
+            { id: 11, type: 'fib', sentence: "They're _____.", blank: 'robots', full: "They're robots.", hint: '機器人 (複數)', icon: '🤖' },
+            { id: 12, type: 'fib', sentence: "_____ are kites.", blank: 'They', full: "They are kites.", hint: '他們/它們 (代名詞)' },
+            { id: 13, type: 'fib', sentence: 'What _____ these?', blank: 'are', full: 'What are these?', hint: '複數使用的 be 動詞' },
+            { id: 14, type: 'fib', sentence: "They're _____.", blank: 'dolls', full: "They're dolls.", hint: '洋娃娃 (複數)', icon: '🪆' },
+            { id: 15, type: 'fib', sentence: "They're toy _____.", blank: 'cars', full: "They're toy cars.", hint: '小汽車 (複數)', icon: '🏎️' },
+            { id: 16, type: 'fib', sentence: "What are _____? (遠處)", blank: 'those', full: 'What are those?', hint: '指著遠方的東西' },
+        ];
+
+        const Icons = {
+            Home: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+            Volume2: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>,
+            RefreshCw: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>,
+            Trophy: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>,
+            CheckCircle: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>,
+            XCircle: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>,
+            Sparkles: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>
+        };
+
+        const App = () => {
+            const [db, setDb] = useState(null);
+            const [user, setUser] = useState(null);
+            const [debugMsg, setDebugMsg] = useState("Initializing system...");
+            const [view, setView] = useState('menu'); 
+            const [currentSection, setCurrentSection] = useState(0); 
+            const [currentIndex, setCurrentIndex] = useState(0);
+            const [score, setScore] = useState(0);
+            const [showFeedback, setShowFeedback] = useState(null); 
+            const [userInput, setUserInput] = useState('');
+            const [isSpeaking, setIsSpeaking] = useState(false);
+            const [preloading, setPreloading] = useState(false);
+            const [progress, setProgress] = useState(0);
+
+            const questions = useMemo(() => currentSection === 0 ? QUESTIONS_MC : QUESTIONS_FIB, [currentSection]);
+
+            // --- Fixed Auth Logic with Robust Fallback (Fix for mismatch error) ---
+            useEffect(() => {
+                const initFirebase = async () => {
+                    if (window.FB) {
+                        try {
+                            const app = window.FB.initializeApp(firebaseConfig);
+                            const auth = window.FB.getAuth(app);
+                            const firestore = window.FB.getFirestore(app);
+                            setDb(firestore);
+
+                            setDebugMsg("⌛ Authenticating...");
+                            
+                            // Try custom token first, fallback to anonymous on error
+                            let authSuccess = false;
+                            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                                try {
+                                    await window.FB.signInWithCustomToken(auth, __initial_auth_token);
+                                    authSuccess = true;
+                                } catch (tokenErr) {
+                                    console.warn("Custom token failed, falling back to anonymous:", tokenErr);
+                                    setDebugMsg("⚠️ Token mismatch, using Anonymous mode...");
+                                }
+                            }
+
+                            if (!authSuccess) {
+                                await window.FB.signInAnonymously(auth);
+                            }
+
+                            window.FB.onAuthStateChanged(auth, (currUser) => {
+                                setUser(currUser);
+                                if (currUser) {
+                                    setDebugMsg(`✅ Connected as ${currUser.isAnonymous ? 'Guest' : 'User'} (${currUser.uid.slice(0,6)})`);
+                                } else {
+                                    setDebugMsg("❌ Auth State Empty");
+                                }
+                            });
+                        } catch (err) {
+                            setDebugMsg(`❌ Critical Firebase Error: ${err.message}`);
+                        }
+                    }
+                };
+
+                const interval = setInterval(() => {
+                    if (window.FB) {
+                        clearInterval(interval);
+                        initFirebase();
+                    }
+                }, 500);
+                return () => clearInterval(interval);
+            }, []);
+
+            const getSafeId = (text) => {
+                return btoa(unescape(encodeURIComponent(text))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+            };
+
+            const pcmToWav = (base64Pcm, sampleRate = 24000) => {
+                if (!base64Pcm || base64Pcm.length < 100) return null;
+                const buffer = Uint8Array.from(atob(base64Pcm), c => c.charCodeAt(0)).buffer;
+                const wavHeader = new ArrayBuffer(44);
+                const view = new DataView(wavHeader);
+                const writeString = (offset, string) => {
+                    for (let i = 0; i < string.length; i++) view.setUint8(offset + i, string.charCodeAt(i));
+                };
+                writeString(0, 'RIFF');
+                view.setUint32(4, 36 + buffer.byteLength, true);
+                writeString(8, 'WAVE');
+                writeString(12, 'fmt ');
+                view.setUint32(16, 16, true);
+                view.setUint16(20, 1, true);
+                view.setUint16(22, 1, true); 
+                view.setUint32(24, sampleRate, true);
+                view.setUint32(28, sampleRate * 2, true);
+                view.setUint16(32, 2, true);
+                view.setUint16(34, 16, true);
+                writeString(36, 'data');
+                view.setUint32(40, buffer.byteLength, true);
+                return new Blob([wavHeader, buffer], { type: 'audio/wav' });
+            };
+
+            const callTTSWithBackoff = async (text, retries = 5) => {
+                for (let i = 0; i < retries; i++) {
+                    try {
+                        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                contents: [{ parts: [{ text: `Say clearly for a child learning English: ${text}` }] }],
+                                generationConfig: {
+                                    responseModalities: ["AUDIO"],
+                                    speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Puck" } } }
+                                },
+                                model: "gemini-2.5-flash-preview-tts"
+                            })
+                        });
+                        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                        const data = await response.json();
+                        return data.candidates[0].content.parts[0].inlineData.data;
+                    } catch (e) {
+                        if (i === retries - 1) throw e;
+                        await new Promise(r => setTimeout(r, Math.pow(2, i) * 1000));
+                    }
+                }
+            };
+
+            const compressImage = async (base64) => {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const MAX_WIDTH = 512;
+                        let width = img.width;
+                        let height = img.height;
+                        if (width > MAX_WIDTH) {
+                            height *= MAX_WIDTH / width;
+                            width = MAX_WIDTH;
+                        }
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        resolve(canvas.toDataURL('image/jpeg', 0.7));
+                    };
+                    img.src = base64;
+                });
+            };
+
+            const generateImage = async (prompt) => {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ instances: [{ prompt }], parameters: { sampleCount: 1 } })
+                });
+                const result = await response.json();
+                const rawBase64 = `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`;
+                return await compressImage(rawBase64);
+            };
+
+            const preloadResources = async () => {
+                if (!db || !user) {
+                    setDebugMsg("❌ Waiting for Cloud Connection...");
+                    return;
+                }
+                setPreloading(true);
+                setProgress(0);
+                setDebugMsg("⌛ Starting Cloud Sync...");
+
+                const allItems = [...QUESTIONS_MC, ...QUESTIONS_FIB];
+                let completed = 0;
+
+                for (const item of allItems) {
+                    const textToSpeak = item.full || `${item.question} ${item.answer}`;
+                    const safeIdAudio = getSafeId(textToSpeak);
+                    
+                    const audioRef = window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'audio_cache', safeIdAudio);
+                    const audioSnap = await window.FB.getDoc(audioRef);
+                    if (!audioSnap.exists()) {
+                        setDebugMsg(`🔊 Generating Audio: ${item.id}`);
+                        const b64 = await callTTSWithBackoff(textToSpeak);
+                        await window.FB.setDoc(audioRef, { b64, createdAt: Date.now() });
+                    }
+
+                    if (item.type === 'mc') {
+                        const safeIdImg = getSafeId(item.imagePrompt);
+                        const imgRef = window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'image_cache', safeIdImg);
+                        const imgSnap = await window.FB.getDoc(imgRef);
+                        if (!imgSnap.exists()) {
+                            setDebugMsg(`🎨 Generating Image: ${item.id}`);
+                            const compressed = await generateImage(item.imagePrompt);
+                            await window.FB.setDoc(imgRef, { url: compressed, createdAt: Date.now() });
+                        }
+                    }
+                    completed++;
+                    setProgress(Math.round((completed / allItems.length) * 100));
+                }
+                setDebugMsg("✅ Cloud Preload Complete!");
+                setPreloading(false);
+            };
+
+            const playAudio = async (text) => {
+                if (isSpeaking) return;
+                setIsSpeaking(true);
+                const safeId = getSafeId(text);
+                
+                try {
+                    let b64;
+                    if (db && user) {
+                        const cacheRef = window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'audio_cache', safeId);
+                        const snap = await window.FB.getDoc(cacheRef);
+                        if (snap.exists()) {
+                            b64 = snap.data().b64;
+                            setDebugMsg("✅ Audio loaded from cache");
+                        }
+                    }
+
+                    if (!b64) {
+                        setDebugMsg("⌛ Calling Gemini TTS...");
+                        b64 = await callTTSWithBackoff(text);
+                        if (db && user) {
+                            const cacheRef = window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'audio_cache', safeId);
+                            window.FB.setDoc(cacheRef, { b64, createdAt: Date.now() });
+                        }
+                    }
+
+                    const blob = pcmToWav(b64);
+                    if (blob) {
+                        const audio = new Audio(URL.createObjectURL(blob));
+                        audio.onended = () => setIsSpeaking(false);
+                        audio.play();
+                    } else throw new Error("Invalid Data");
+                } catch (e) {
+                    setDebugMsg(`⚠️ Fallback TTS: ${e.message}`);
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.onend = () => setIsSpeaking(false);
+                    window.speechSynthesis.speak(utterance);
+                }
+            };
+
+            const handleAnswer = (answer) => {
+                if (showFeedback) return;
+                const q = questions[currentIndex];
+                const isCorrect = currentSection === 0 
+                    ? answer === q.answer 
+                    : answer.toLowerCase().trim() === q.blank.toLowerCase();
+
+                if (isCorrect) {
+                    setScore(s => s + 1);
+                    setShowFeedback('correct');
+                    playAudio("Great job! That is correct.");
+                } else {
+                    setShowFeedback('wrong');
+                    playAudio("Oops! Let's try again.");
+                }
+
+                setTimeout(() => {
+                    if (currentIndex < questions.length - 1) {
+                        setCurrentIndex(i => i + 1);
+                        setShowFeedback(null);
+                        setUserInput('');
+                    } else setView('result');
+                }, 2500);
+            };
+
+            const RenderMCImage = ({ prompt }) => {
+                const [imgUrl, setImgUrl] = useState(null);
+                const safeId = getSafeId(prompt);
+                useEffect(() => {
+                    if (!db || !user) return;
+                    const fetchImg = async () => {
+                        const ref = window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'image_cache', safeId);
+                        const snap = await window.FB.getDoc(ref);
+                        if (snap.exists()) setImgUrl(snap.data().url);
+                    };
+                    fetchImg();
+                }, [db, user, prompt]);
+
+                return (
+                    <div className="w-64 h-64 bg-gray-100 rounded-2xl flex items-center justify-center overflow-hidden border-2 border-dashed border-blue-200">
+                        {imgUrl ? <img src={imgUrl} className="w-full h-full object-cover" /> : 
+                        <div className="text-gray-400 flex flex-col items-center"><Icons.Sparkles /><span className="text-xs mt-2">Loading...</span></div>}
+                    </div>
+                );
+            };
+
+            const renderMenu = () => (
+                <div className="flex flex-col items-center justify-center min-h-[500px] bg-yellow-50 p-6 rounded-3xl shadow-xl border-4 border-yellow-200">
+                    <div className="text-6xl mb-4 animate-bounce">🎒</div>
+                    <h1 className="text-4xl font-black text-yellow-600 mb-2">Toy Workshop!</h1>
+                    <p className="text-gray-600 mb-8 text-center text-lg">讓我們一起練習玩具單字與句型吧！</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-md">
+                        <button onClick={() => { setCurrentSection(0); setCurrentIndex(0); setScore(0); setView('game'); }} className="flex flex-col items-center bg-white p-6 rounded-2xl border-b-8 border-blue-600 hover:translate-y-1 transition-all shadow-lg active:bg-blue-50">
+                            <span className="text-4xl mb-2">🔍</span><span className="font-bold text-blue-700">看圖選選看</span>
+                        </button>
+                        <button onClick={() => { setCurrentSection(1); setCurrentIndex(0); setScore(0); setView('game'); }} className="flex flex-col items-center bg-white p-6 rounded-2xl border-b-8 border-purple-600 hover:translate-y-1 transition-all shadow-lg active:bg-purple-50">
+                            <span className="text-4xl mb-2">✍️</span><span className="font-bold text-purple-700">小偵探填填看</span>
+                        </button>
+                    </div>
+                    <button onClick={preloadResources} disabled={preloading} className={`mt-10 flex items-center gap-3 px-8 py-3 rounded-full font-bold shadow-xl transition-all ${preloading ? 'bg-gray-400' : 'bg-gradient-to-r from-green-500 to-teal-500 text-white hover:scale-105'}`}>
+                        {preloading ? <Icons.RefreshCw /> : <Icons.Sparkles />}
+                        {preloading ? `Syncing... ${progress}%` : '一鍵預載語音與圖片 (Pregen)'}
+                    </button>
+                </div>
+            );
+
+            const renderGame = () => {
+                const q = questions[currentIndex];
+                const isMC = currentSection === 0;
+                return (
+                    <div className="relative max-w-2xl mx-auto bg-white rounded-3xl shadow-2xl overflow-hidden border-4 border-blue-100 min-h-[580px] flex flex-col">
+                        <div className="bg-blue-500 p-4 text-white flex justify-between items-center">
+                            <button onClick={() => setView('menu')} className="p-2 hover:bg-blue-600 rounded-full"><Icons.Home /></button>
+                            <div className="font-bold">Q {currentIndex + 1} / {questions.length}</div>
+                            <div className="bg-yellow-400 text-blue-900 px-4 py-1 rounded-full font-black">Score: {score}</div>
+                        </div>
+                        <div className="w-full bg-blue-100 h-2"><div className="bg-yellow-400 h-full transition-all" style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }} /></div>
+                        <div className="p-8 flex-grow flex flex-col items-center">
+                            <button onClick={() => playAudio(isMC ? `${q.question} ${q.answer}` : q.full)} className={`p-5 mb-4 bg-blue-100 text-blue-600 rounded-full ${isSpeaking ? 'opacity-50 ring-4 ring-blue-300' : 'animate-pulse'}`} disabled={isSpeaking}><Icons.Volume2 /></button>
+                            {isMC ? (
+                                <><h2 className="text-3xl font-bold mb-6">{q.question}</h2><RenderMCImage prompt={q.imagePrompt} />
+                                <div className="grid grid-cols-1 gap-3 w-full mt-6">{q.options.map((opt, i) => (
+                                    <button key={i} disabled={showFeedback} onClick={() => handleAnswer(opt)} className={`p-4 rounded-xl text-lg font-semibold border-2 ${showFeedback === 'correct' && opt === q.answer ? 'bg-green-100 border-green-500 text-green-700' : showFeedback === 'wrong' && opt !== q.answer ? 'bg-red-50 border-red-200' : 'bg-white border-blue-100 hover:bg-blue-50'}`}>{opt}</button>
+                                ))}</div></>
+                            ) : (
+                                <><h2 className="text-2xl text-gray-500 mb-4">聽一聽，填入正確的單字</h2><div className="flex flex-col items-center gap-6 w-full">
+                                {q.icon && <div className="text-7xl mb-2">{q.icon} {q.icon}</div>}
+                                <div className="text-3xl font-bold text-blue-600 flex flex-wrap justify-center gap-2">{q.sentence.split('_____').map((part, i, arr) => (
+                                    <React.Fragment key={i}>{part}{i < arr.length - 1 && <input autoFocus type="text" value={userInput} onChange={(e) => setUserInput(e.target.value)} className="border-b-4 border-blue-300 outline-none w-40 text-center bg-transparent" onKeyDown={(e) => e.key === 'Enter' && handleAnswer(userInput)} />}</React.Fragment>
+                                ))}</div>
+                                <button onClick={() => handleAnswer(userInput)} disabled={!userInput || showFeedback} className="px-10 py-3 bg-purple-600 text-white rounded-full font-bold">Check</button>
+                                <p className="text-gray-400 italic text-sm">Hint: {q.hint}</p></div></>
+                            )}
+                        </div>
+                        {showFeedback && <div className="absolute inset-0 flex items-center justify-center bg-white/90 z-10"><div className="flex flex-col items-center feedback-bounce">{showFeedback === 'correct' ? <div className="text-green-500 flex flex-col items-center"><Icons.CheckCircle /><p className="text-4xl font-black mt-4">EXCELLENT!</p></div> : <div className="text-red-500 flex flex-col items-center"><Icons.XCircle /><p className="text-4xl font-black mt-4">TRY AGAIN!</p><p className="text-gray-600 mt-2 font-bold">Answer: {isMC ? q.answer : q.blank}</p></div>}</div></div>}
+                    </div>
+                );
+            };
+
+            return (
+                <div className="p-4 md:p-10 select-none">
+                    <div className="max-w-4xl mx-auto">
+                        {view === 'menu' && renderMenu()}
+                        {view === 'game' && renderGame()}
+                        {view === 'result' && (
+                            <div className="flex flex-col items-center justify-center min-h-[500px] bg-white p-6 rounded-3xl shadow-xl border-4 border-blue-100">
+                                <Icons.Trophy /><h1 className="text-4xl font-black text-blue-800 mt-4">單元完成！</h1><p className="text-xl text-gray-600 mb-8">你得到了 {score} / {questions.length} 分</p>
+                                <div className="flex gap-4"><button onClick={() => setView('menu')} className="px-6 py-3 bg-gray-200 rounded-full font-bold">返回首頁</button><button onClick={() => { setCurrentIndex(0); setScore(0); setView('game'); }} className="px-8 py-3 bg-blue-600 text-white rounded-full font-bold">再挑戰一次</button></div>
+                            </div>
+                        )}
+                    </div>
+                    <div className="fixed bottom-0 left-0 w-full bg-slate-900/90 text-[10px] text-teal-400 p-1 px-4 flex justify-between items-center font-mono z-50">
+                        <div className="flex gap-4"><span>UID: {user?.uid || 'Guest'}</span><span>APP: {appId}</span></div>
+                        <div className="flex items-center gap-2"><span className={user ? "text-green-400" : "text-yellow-400 animate-pulse"}>●</span>{debugMsg}</div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
