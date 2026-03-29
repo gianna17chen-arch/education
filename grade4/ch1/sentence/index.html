@@ -37,7 +37,8 @@
 
         // --- Configuration & Constants ---
         const themeId = "toy-workshop-v1";
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'toy-english-game';
+        // CRITICAL: Ensure appId is consistent across environments
+        const appId = "toy-workshop-production"; 
         const apiKey = ""; // Provided by environment
 
         const firebaseConfig = {
@@ -110,7 +111,7 @@
 
             const questions = useMemo(() => currentSection === 0 ? QUESTIONS_MC : QUESTIONS_FIB, [currentSection]);
 
-            // --- Fixed Auth Logic with Robust Fallback (Fix for mismatch error) ---
+            // --- Fixed Auth Logic with Robust Fallback ---
             useEffect(() => {
                 const initFirebase = async () => {
                     if (window.FB) {
@@ -122,7 +123,6 @@
 
                             setDebugMsg("⌛ Authenticating...");
                             
-                            // Try custom token first, fallback to anonymous on error
                             let authSuccess = false;
                             if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                                 try {
@@ -130,7 +130,6 @@
                                     authSuccess = true;
                                 } catch (tokenErr) {
                                     console.warn("Custom token failed, falling back to anonymous:", tokenErr);
-                                    setDebugMsg("⚠️ Token mismatch, using Anonymous mode...");
                                 }
                             }
 
@@ -141,7 +140,7 @@
                             window.FB.onAuthStateChanged(auth, (currUser) => {
                                 setUser(currUser);
                                 if (currUser) {
-                                    setDebugMsg(`✅ Connected as ${currUser.isAnonymous ? 'Guest' : 'User'} (${currUser.uid.slice(0,6)})`);
+                                    setDebugMsg(`✅ Connected: ${currUser.isAnonymous ? 'Guest' : 'User'} | ID: ${appId}`);
                                 } else {
                                     setDebugMsg("❌ Auth State Empty");
                                 }
@@ -249,12 +248,12 @@
 
             const preloadResources = async () => {
                 if (!db || !user) {
-                    setDebugMsg("❌ Waiting for Cloud Connection...");
+                    setDebugMsg("❌ Login required for cloud sync");
                     return;
                 }
                 setPreloading(true);
                 setProgress(0);
-                setDebugMsg("⌛ Starting Cloud Sync...");
+                setDebugMsg(`⌛ Syncing to path: artifacts/${appId}`);
 
                 const allItems = [...QUESTIONS_MC, ...QUESTIONS_FIB];
                 let completed = 0;
@@ -266,7 +265,7 @@
                     const audioRef = window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'audio_cache', safeIdAudio);
                     const audioSnap = await window.FB.getDoc(audioRef);
                     if (!audioSnap.exists()) {
-                        setDebugMsg(`🔊 Generating Audio: ${item.id}`);
+                        setDebugMsg(`🔊 Uploading Audio: ${item.id}`);
                         const b64 = await callTTSWithBackoff(textToSpeak);
                         await window.FB.setDoc(audioRef, { b64, createdAt: Date.now() });
                     }
@@ -276,7 +275,7 @@
                         const imgRef = window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'image_cache', safeIdImg);
                         const imgSnap = await window.FB.getDoc(imgRef);
                         if (!imgSnap.exists()) {
-                            setDebugMsg(`🎨 Generating Image: ${item.id}`);
+                            setDebugMsg(`🎨 Uploading Image: ${item.id}`);
                             const compressed = await generateImage(item.imagePrompt);
                             await window.FB.setDoc(imgRef, { url: compressed, createdAt: Date.now() });
                         }
@@ -284,7 +283,7 @@
                     completed++;
                     setProgress(Math.round((completed / allItems.length) * 100));
                 }
-                setDebugMsg("✅ Cloud Preload Complete!");
+                setDebugMsg("✅ Upload Finished! Please check your Firestore.");
                 setPreloading(false);
             };
 
@@ -300,16 +299,17 @@
                         const snap = await window.FB.getDoc(cacheRef);
                         if (snap.exists()) {
                             b64 = snap.data().b64;
-                            setDebugMsg("✅ Audio loaded from cache");
+                            setDebugMsg("☁️ Cache Hit: Audio loaded");
+                        } else {
+                            setDebugMsg("🔍 Cache Miss: Audio");
                         }
                     }
 
                     if (!b64) {
-                        setDebugMsg("⌛ Calling Gemini TTS...");
                         b64 = await callTTSWithBackoff(text);
                         if (db && user) {
                             const cacheRef = window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'audio_cache', safeId);
-                            window.FB.setDoc(cacheRef, { b64, createdAt: Date.now() });
+                            window.FB.setDoc(cacheRef, { b64, createdAt: Date.now() }).catch(e => console.error("Save error", e));
                         }
                     }
 
@@ -318,7 +318,7 @@
                         const audio = new Audio(URL.createObjectURL(blob));
                         audio.onended = () => setIsSpeaking(false);
                         audio.play();
-                    } else throw new Error("Invalid Data");
+                    } else throw new Error("Audio creation failed");
                 } catch (e) {
                     setDebugMsg(`⚠️ Fallback TTS: ${e.message}`);
                     const utterance = new SpeechSynthesisUtterance(text);
@@ -354,21 +354,35 @@
 
             const RenderMCImage = ({ prompt }) => {
                 const [imgUrl, setImgUrl] = useState(null);
+                const [status, setStatus] = useState("checking");
                 const safeId = getSafeId(prompt);
+                
                 useEffect(() => {
                     if (!db || !user) return;
                     const fetchImg = async () => {
                         const ref = window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'image_cache', safeId);
                         const snap = await window.FB.getDoc(ref);
-                        if (snap.exists()) setImgUrl(snap.data().url);
+                        if (snap.exists()) {
+                            setImgUrl(snap.data().url);
+                            setStatus("cached");
+                        } else {
+                            setStatus("missing");
+                        }
                     };
                     fetchImg();
                 }, [db, user, prompt]);
 
                 return (
-                    <div className="w-64 h-64 bg-gray-100 rounded-2xl flex items-center justify-center overflow-hidden border-2 border-dashed border-blue-200">
-                        {imgUrl ? <img src={imgUrl} className="w-full h-full object-cover" /> : 
-                        <div className="text-gray-400 flex flex-col items-center"><Icons.Sparkles /><span className="text-xs mt-2">Loading...</span></div>}
+                    <div className="w-64 h-64 bg-gray-100 rounded-2xl flex items-center justify-center overflow-hidden border-2 border-dashed border-blue-200 relative">
+                        {imgUrl ? (
+                            <img src={imgUrl} className="w-full h-full object-cover" />
+                        ) : (
+                            <div className="text-gray-400 flex flex-col items-center">
+                                <Icons.Sparkles />
+                                <span className="text-[10px] mt-2 uppercase tracking-widest">{status === 'checking' ? 'Connecting...' : 'No Cache Found'}</span>
+                            </div>
+                        )}
+                        {status === 'cached' && <span className="absolute top-2 right-2 text-[10px] bg-green-500 text-white px-2 py-1 rounded-full opacity-50">Cloud Cached</span>}
                     </div>
                 );
             };
@@ -388,7 +402,7 @@
                     </div>
                     <button onClick={preloadResources} disabled={preloading} className={`mt-10 flex items-center gap-3 px-8 py-3 rounded-full font-bold shadow-xl transition-all ${preloading ? 'bg-gray-400' : 'bg-gradient-to-r from-green-500 to-teal-500 text-white hover:scale-105'}`}>
                         {preloading ? <Icons.RefreshCw /> : <Icons.Sparkles />}
-                        {preloading ? `Syncing... ${progress}%` : '一鍵預載語音與圖片 (Pregen)'}
+                        {preloading ? `Uploading... ${progress}%` : '一鍵上傳語音與圖片到雲端'}
                     </button>
                 </div>
             );
@@ -438,9 +452,16 @@
                             </div>
                         )}
                     </div>
-                    <div className="fixed bottom-0 left-0 w-full bg-slate-900/90 text-[10px] text-teal-400 p-1 px-4 flex justify-between items-center font-mono z-50">
-                        <div className="flex gap-4"><span>UID: {user?.uid || 'Guest'}</span><span>APP: {appId}</span></div>
-                        <div className="flex items-center gap-2"><span className={user ? "text-green-400" : "text-yellow-400 animate-pulse"}>●</span>{debugMsg}</div>
+                    {/* Debug Bar with Path Info */}
+                    <div className="fixed bottom-0 left-0 w-full bg-slate-900/95 text-[10px] text-teal-400 p-1 px-4 flex justify-between items-center font-mono z-50">
+                        <div className="flex gap-4">
+                            <span>UID: {user?.uid ? user.uid.slice(0,8) : 'Guest'}</span>
+                            <span className="text-yellow-500">PATH: artifacts/{appId}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className={user ? "text-green-400" : "text-red-400 animate-pulse"}>●</span>
+                            {debugMsg}
+                        </div>
                     </div>
                 </div>
             );
