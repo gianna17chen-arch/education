@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suffixes: Who Are They? - 英文人稱字尾探險</title>
+    <!-- CDN Dependencies -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Quicksand', 'Noto Sans TC', sans-serif;
+            background: #fdf5e6; /* Warm wood/cream background */
+            background-image: url("https://www.transparenttextures.com/patterns/wood-pattern.png");
+        }
+        .macaron-blue { background-color: #E3F2FD; }
+        .macaron-pink { background-color: #FCE4EC; }
+        .macaron-green { background-color: #E8F5E9; }
+        .macaron-yellow { background-color: #FFFDE7; }
+        .macaron-purple { background-color: #F3E5F5; }
+        .macaron-orange { background-color: #FFF3E0; }
+        
+        .card-shadow {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06), inset 0 2px 4px rgba(255,255,255,0.5);
+            border: 2px solid rgba(255,255,255,0.8);
+        }
+        .progress-fill { transition: width 0.3s ease-in-out; }
+        
+        /* Loading animation for buttons */
+        @keyframes pulse-soft {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        .loading-pulse { animation: pulse-soft 1.5s infinite; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <!-- Firebase SDK (Module Script) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        window.FB = { 
+            initializeApp, getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken,
+            getFirestore, doc, getDoc, setDoc, collection, onSnapshot 
+        };
+    </script>
+
+    <!-- React App (Babel Script) -->
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
+
+        const themeId = "grade5-suffixes-people";
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const apiKey = ""; // Injected at runtime
+        const firebaseConfig = {
+            apiKey: "AIzaSyBnjfbh1ow4j6gXBP9XeBQkCt_cs7Uv3ds",
+            authDomain: "education-b38d5.firebaseapp.com",
+            projectId: "education-b38d5",
+            storageBucket: "education-b38d5.firebasestorage.app",
+            messagingSenderId: "450320441540",
+            appId: "1:450320441540:web:888014b1380a473a142991",
+            measurementId: "G-70DQ70W0B8"
+        };
+
+        const suffixData = [
+            { suffix: "-er", meaning: "代表「做某事的人」或「某種職業」", color: "macaron-blue", words: [
+                { word: "Teacher", translation: "老師", sentence: "A teacher helps students learn new things.", sentTrans: "老師幫助學生學習新事物。", root: "teach + er" },
+                { word: "Baker", translation: "烘焙師", sentence: "The baker makes fresh bread every morning.", sentTrans: "烘焙師每天早上製作新鮮麵包。", root: "bake + er" }
+            ]},
+            { suffix: "-or", meaning: "代表「從事某種行為或職業的人」", color: "macaron-pink", words: [
+                { word: "Actor", translation: "演員", sentence: "The actor performed well on the stage.", sentTrans: "演員在舞台上表演得很好。", root: "act + or" },
+                { word: "Visitor", translation: "訪客", sentence: "We have a visitor from London today.", sentTrans: "我們今天有一位來自倫敦的訪客。", root: "visit + or" }
+            ]},
+            { suffix: "-ist", meaning: "代表「從事某項研究或專業的人」", color: "macaron-green", words: [
+                { word: "Scientist", translation: "科學家", sentence: "The scientist is working in the lab.", sentTrans: "科學家正在實驗室工作。", root: "science + ist" },
+                { word: "Artist", translation: "藝術家", sentence: "The artist painted a beautiful sunset.", sentTrans: "藝術家畫了一抹美麗的日落。", root: "art + ist" }
+            ]},
+            { suffix: "-ent / -ant", meaning: "代表「具有某種身分或功能的人」", color: "macaron-yellow", words: [
+                { word: "Student", translation: "學生", sentence: "The student is reading a book quietly.", sentTrans: "學生正在安靜地讀書。", root: "study + ent" },
+                { word: "Assistant", translation: "助理", sentence: "The assistant helps the manager with tasks.", sentTrans: "助理幫助經理處理事務。", root: "assist + ant" }
+            ]},
+            { suffix: "-ian", meaning: "代表「專業技能者」或「某地的人」", color: "macaron-purple", words: [
+                { word: "Musician", translation: "音樂家", sentence: "The musician plays the piano beautifully.", sentTrans: "音樂家彈奏鋼琴非常動聽。", root: "music + ian" },
+                { word: "Magician", translation: "魔術師", sentence: "The magician pulled a rabbit out of the hat.", sentTrans: "魔術師從帽子裡拉出了一隻兔子。", root: "magic + ian" }
+            ]},
+            { suffix: "-ee", meaning: "代表「動作的接受者」", color: "macaron-orange", words: [
+                { word: "Employee", translation: "員工", sentence: "Every employee should arrive on time.", sentTrans: "每位員工都應該準時到達。", root: "employ + ee" }
+            ]}
+        ];
+
+        const getSafeId = (text) => btoa(unescape(encodeURIComponent(text))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        const pcmToWav = (pcmData, sampleRate = 24000) => {
+            const buffer = new ArrayBuffer(44 + pcmData.length);
+            const view = new DataView(buffer);
+            const writeString = (offset, string) => {
+                for (let i = 0; i < string.length; i++) view.setUint8(offset + i, string.charCodeAt(i));
+            };
+            writeString(0, 'RIFF');
+            view.setUint32(4, 36 + pcmData.length, true);
+            writeString(8, 'WAVE');
+            writeString(12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, 1, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true);
+            writeString(36, 'data');
+            view.setUint32(40, pcmData.length, true);
+            new Uint8Array(buffer, 44).set(new Uint8Array(pcmData));
+            return new Blob([buffer], { type: 'audio/wav' });
+        };
+
+        const Icon = ({ name, className = "w-5 h-5" }) => {
+            const icons = {
+                play: <path d="M5 3l14 9-14 9V3z" fill="currentColor" />,
+                volume: <path d="M11 5L6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 010 7.07M19.07 4.93a9 9 0 010 14.14" fill="none" stroke="currentColor" strokeWidth="2" />,
+                check: <path d="M20 6L9 17l-5-5" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />,
+                sync: <path d="M21 2v6h-6M3 12a9 9 0 0115-6.7L21 8M3 22v-6h6M21 12a9 9 0 01-15 6.7L3 16" fill="none" stroke="currentColor" strokeWidth="2" />,
+                star: <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="currentColor" />,
+                alert: <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            };
+            return <svg viewBox="0 0 24 24" className={className}>{icons[name] || null}</svg>;
+        };
+
+        function App() {
+            const [user, setUser] = useState(null);
+            const [db, setDb] = useState(null);
+            const [debugMsg, setDebugMsg] = useState("正在初始化系統...");
+            const [activeTab, setActiveTab] = useState("learning");
+            const [pregenStatus, setPregenStatus] = useState({ active: false, progress: 0 });
+            const [mediaCache, setMediaCache] = useState({});
+            const [isGenerating, setIsGenerating] = useState({});
+            const [score, setScore] = useState(0);
+            const [quizIndex, setQuizIndex] = useState(0);
+
+            // Firebase Initialization with Token Fallback Logic
+            useEffect(() => {
+                let interval = setInterval(async () => {
+                    if (window.FB) {
+                        clearInterval(interval);
+                        try {
+                            const app = window.FB.initializeApp(firebaseConfig);
+                            const auth = window.FB.getAuth(app);
+                            const firestore = window.FB.getFirestore(app);
+                            setDb(firestore);
+
+                            // Auth Rule 3 Implementation with Error Recovery
+                            const initializeAuth = async () => {
+                                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                                    try {
+                                        await window.FB.signInWithCustomToken(auth, __initial_auth_token);
+                                        setDebugMsg("✅ Token 認證成功");
+                                    } catch (tokenErr) {
+                                        console.warn("Custom token failed, falling back to anonymous login:", tokenErr);
+                                        setDebugMsg("⚠️ Token 匹配失敗，切換至匿名登入...");
+                                        await window.FB.signInAnonymously(auth);
+                                    }
+                                } else {
+                                    await window.FB.signInAnonymously(auth);
+                                    setDebugMsg("✅ 匿名登入成功");
+                                }
+                            };
+
+                            await initializeAuth();
+
+                            window.FB.onAuthStateChanged(auth, (u) => {
+                                setUser(u);
+                                if (u) setDebugMsg(`✅ 系統就緒 (UID: ${u.uid})`);
+                            });
+                        } catch (err) {
+                            setDebugMsg(`❌ 連線錯誤: ${err.message}`);
+                        }
+                    }
+                }, 500);
+                return () => clearInterval(interval);
+            }, []);
+
+            // --- Media Pipeline ---
+            const fetchWithRetry = async (url, options, retries = 5) => {
+                for (let i = 0; i < retries; i++) {
+                    try {
+                        const response = await fetch(url, options);
+                        if (response.ok) return response;
+                        
+                        if (response.status === 403 && !apiKey) {
+                            setDebugMsg("❌ 快取不存在且無法取得 API 授權，請確認金鑰設定");
+                            throw new Error("AUTH_FAIL");
+                        }
+                        
+                        if (i < retries - 1) {
+                            setDebugMsg(`⏳ 連線重試中 (${i + 1}/${retries})...`);
+                            await sleep(Math.pow(2, i) * 1000);
+                        }
+                    } catch (err) {
+                        if (err.message === "AUTH_FAIL") throw err;
+                        if (i === retries - 1) throw err;
+                        await sleep(Math.pow(2, i) * 1000);
+                    }
+                }
+                throw new Error("RETRY_LIMIT_REACHED");
+            };
+
+            const getMediaFromCloud = async (type, id) => {
+                if (!db || !user) return null;
+                try {
+                    const docRef = window.FB.doc(db, 'artifacts', appId, 'public', 'data', `${themeId}_${type}`, id);
+                    const docSnap = await window.FB.getDoc(docRef);
+                    return docSnap.exists() ? docSnap.data().content : null;
+                } catch (e) { return null; }
+            };
+
+            const saveMediaToCloud = async (type, id, content) => {
+                if (!db || !user) return;
+                try {
+                    const docRef = window.FB.doc(db, 'artifacts', appId, 'public', 'data', `${themeId}_${type}`, id);
+                    await window.FB.setDoc(docRef, { content, timestamp: Date.now(), userId: user.uid });
+                } catch (e) {}
+            };
+
+            const processImage = (base64) => {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.src = `data:image/png;base64,${base64}`;
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        const width = 512;
+                        const height = (img.height / img.width) * width;
+                        canvas.width = width;
+                        canvas.height = height;
+                        ctx.drawImage(img, 0, 0, width, height);
+                        resolve(canvas.toDataURL('image/jpeg', 0.7));
+                    };
+                });
+            };
+
+            const playAudio = async (text) => {
+                if (!db || !user) return;
+                const safeId = getSafeId(text);
+                if (mediaCache[`audio_${safeId}`]) {
+                    new Audio(mediaCache[`audio_${safeId}`]).play();
+                    return;
+                }
+
+                const cloudAudio = await getMediaFromCloud('audio', safeId);
+                if (cloudAudio) {
+                    setMediaCache(prev => ({...prev, [`audio_${safeId}`]: cloudAudio}));
+                    new Audio(cloudAudio).play();
+                    return;
+                }
+
+                try {
+                    setDebugMsg(`⌛ 正在準備語音: ${text.substring(0, 10)}...`);
+                    const response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: `Say naturally: ${text}` }] }],
+                            generationConfig: { 
+                                responseModalities: ["AUDIO"],
+                                speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } }
+                            }
+                        })
+                    });
+                    const result = await response.json();
+                    const pcmBase64 = result.candidates[0].content.parts[0].inlineData.data;
+                    const pcmBuffer = Uint8Array.from(atob(pcmBase64), c => c.charCodeAt(0));
+                    const wavBlob = pcmToWav(pcmBuffer);
+                    const wavUrl = URL.createObjectURL(wavBlob);
+                    
+                    setMediaCache(prev => ({...prev, [`audio_${safeId}`]: wavUrl}));
+                    saveMediaToCloud('audio', safeId, pcmBase64); 
+                    new Audio(wavUrl).play();
+                    setDebugMsg(`✅ 語音播放成功`);
+                } catch (err) {
+                    setDebugMsg(`⚠️ API 備援: 使用系統語音`);
+                    const utter = new SpeechSynthesisUtterance(text);
+                    utter.lang = 'en-US';
+                    window.speechSynthesis.speak(utter);
+                }
+            };
+
+            const generateWordImage = async (word) => {
+                if (!db || !user) return null;
+                const safeId = getSafeId(word);
+                setIsGenerating(prev => ({...prev, [word]: true}));
+
+                const cloudImg = await getMediaFromCloud('image', safeId);
+                if (cloudImg) {
+                    setMediaCache(prev => ({...prev, [`image_${safeId}`]: cloudImg}));
+                    setIsGenerating(prev => ({...prev, [word]: false}));
+                    setDebugMsg(`✅ 已從雲端快取載入插圖: ${word}`);
+                    return cloudImg;
+                }
+
+                try {
+                    setDebugMsg(`🎨 正在創作插圖: ${word}...`);
+                    const response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            instances: { prompt: `Children's picture book style, whimsical, warm and cheerful, storytelling illustration of a cute ${word}, white background, soft lighting` },
+                            parameters: { sampleCount: 1 }
+                        })
+                    });
+                    const result = await response.json();
+                    if (!result.predictions?.[0]?.bytesBase64Encoded) throw new Error("EMPTY_RESULT");
+                    
+                    const compressedBase64 = await processImage(result.predictions[0].bytesBase64Encoded);
+                    setMediaCache(prev => ({...prev, [`image_${safeId}`]: compressedBase64}));
+                    saveMediaToCloud('image', safeId, compressedBase64);
+                    setDebugMsg(`✅ 插圖生成成功: ${word}`);
+                    return compressedBase64;
+                } catch (err) {
+                    setDebugMsg(`❌ 插圖失敗: ${err.message}`);
+                    return null;
+                } finally {
+                    setIsGenerating(prev => ({...prev, [word]: false}));
+                }
+            };
+
+            const handlePregenAll = async () => {
+                if (pregenStatus.active) return;
+                setPregenStatus({ active: true, progress: 0 });
+                const allWords = suffixData.flatMap(s => s.words);
+                let count = 0;
+                for (const item of allWords) {
+                    await generateWordImage(item.word);
+                    count++;
+                    setPregenStatus(prev => ({ ...prev, progress: Math.floor((count / allWords.length) * 100) }));
+                }
+                setPregenStatus({ active: false, progress: 100 });
+            };
+
+            // Quiz Logic
+            const quizQuestions = useMemo(() => {
+                const qs = [];
+                suffixData.forEach(s => {
+                    s.words.forEach(w => {
+                        qs.push({
+                            word: w.word,
+                            root: w.root,
+                            correct: s.suffix.split(' / ')[0],
+                            fullSuffix: s.suffix,
+                            options: suffixData.map(x => x.suffix.split(' / ')[0]).sort(() => Math.random() - 0.5)
+                        });
+                    });
+                });
+                return qs.sort(() => Math.random() - 0.5);
+            }, []);
+
+            const handleAnswer = (ans) => {
+                const q = quizQuestions[quizIndex];
+                if (ans === q.correct) {
+                    setScore(s => s + 10);
+                    setDebugMsg("✨ 答對了！你太棒了！");
+                } else {
+                    setDebugMsg(`💡 再想一下，${q.word} 的字根是 ${q.root}`);
+                }
+                if (quizIndex < quizQuestions.length - 1) setQuizIndex(quizIndex + 1);
+                else {
+                    setActiveTab("achievements");
+                    setDebugMsg("🏆 挑戰完成！");
+                }
+            };
+
+            return (
+                <div className="min-h-screen pb-24">
+                    {/* Header */}
+                    <header className="bg-amber-100 border-b-4 border-amber-200 p-6 text-center shadow-lg relative">
+                        <h1 className="text-4xl font-bold text-amber-800 drop-shadow-sm">
+                             Who Are They? <span className="text-2xl block mt-1 text-amber-600 font-medium">英文人稱字尾探險</span>
+                        </h1>
+                        <div className="mt-4 flex justify-center gap-4">
+                            <button 
+                                onClick={handlePregenAll}
+                                disabled={pregenStatus.active || !db}
+                                className={`flex items-center gap-2 px-6 py-2 rounded-full font-bold shadow-md transition-all ${pregenStatus.active ? 'bg-amber-200 cursor-not-allowed' : 'bg-white text-amber-700 hover:scale-105 active:scale-95'}`}
+                            >
+                                <Icon name="sync" className={pregenStatus.active ? "animate-spin" : ""} />
+                                {pregenStatus.active ? `快取中 (${pregenStatus.progress}%)` : "一鍵合成全課語音與插圖"}
+                            </button>
+                        </div>
+                        {pregenStatus.active && (
+                            <div className="absolute bottom-0 left-0 w-full h-1 bg-gray-200">
+                                <div className="h-full bg-amber-500 progress-fill" style={{ width: `${pregenStatus.progress}%` }}></div>
+                            </div>
+                        )}
+                    </header>
+
+                    {/* Navigation */}
+                    <nav className="flex justify-center gap-4 my-6">
+                        {[
+                            {id: "learning", label: "單字教學區"},
+                            {id: "quiz", label: "測驗區"},
+                            {id: "achievements", label: "成就獎勵區"}
+                        ].map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`px-8 py-2 rounded-full font-bold transition-all ${activeTab === tab.id ? 'bg-amber-600 text-white scale-110 shadow-lg' : 'bg-white text-amber-600 border-2 border-amber-100'}`}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
+                    </nav>
+
+                    {/* Content */}
+                    <main className="max-w-6xl mx-auto px-4">
+                        {activeTab === "learning" && (
+                            <div className="space-y-12">
+                                {suffixData.map(section => (
+                                    <div key={section.suffix} className={`rounded-3xl p-8 border-4 border-white card-shadow ${section.color}`}>
+                                        <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-3 mb-6">
+                                            <span className="bg-white px-4 py-1 rounded-2xl shadow-sm">{section.suffix}</span>
+                                            <span className="text-xl text-gray-600 font-medium">{section.meaning}</span>
+                                        </h2>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                            {section.words.map(w => {
+                                                const imgUrl = mediaCache[`image_${getSafeId(w.word)}`];
+                                                const loading = isGenerating[w.word];
+                                                return (
+                                                    <div key={w.word} className="bg-white/90 rounded-2xl p-6 flex gap-6 hover:bg-white transition-all group border-2 border-transparent hover:border-amber-200">
+                                                        <div className="w-32 h-32 rounded-xl bg-gray-100 flex-shrink-0 overflow-hidden relative border-2 border-amber-50 shadow-inner">
+                                                            {imgUrl ? (
+                                                                <img src={imgUrl} alt={w.word} className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                <button 
+                                                                    onClick={() => generateWordImage(w.word)}
+                                                                    disabled={loading || !db}
+                                                                    className={`w-full h-full flex flex-col items-center justify-center text-gray-400 text-xs gap-2 p-2 hover:bg-amber-50 transition-colors ${loading ? 'loading-pulse' : ''}`}
+                                                                >
+                                                                    {loading ? <Icon name="sync" className="animate-spin w-6 h-6" /> : <Icon name="sync" className="w-6 h-6 opacity-40" />}
+                                                                    {loading ? "正在生成..." : "生成配圖"}
+                                                                </button>
+                                                            )}
+                                                            {imgUrl && (
+                                                                <div className="absolute top-1 right-1 bg-green-500 text-white p-0.5 rounded-full shadow-sm">
+                                                                    <Icon name="check" className="w-3 h-3" />
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex-grow">
+                                                            <div className="flex items-center justify-between mb-2">
+                                                                <div>
+                                                                    <span className="text-2xl font-bold text-amber-900">{w.word}</span>
+                                                                    <span className="ml-2 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-lg border border-amber-100">{w.root}</span>
+                                                                </div>
+                                                                <button onClick={() => playAudio(w.word)} className="p-2 bg-amber-100 text-amber-700 rounded-full hover:bg-amber-200 shadow-sm">
+                                                                    <Icon name="volume" />
+                                                                </button>
+                                                            </div>
+                                                            <p className="text-gray-700 font-semibold mb-3">{w.translation}</p>
+                                                            <div className="p-3 bg-white/50 rounded-xl border-l-4 border-amber-300 italic text-sm text-gray-600 relative">
+                                                                {w.sentence}
+                                                                <button onClick={() => playAudio(w.sentence)} className="absolute -top-3 -right-3 p-1.5 bg-white shadow-md rounded-full text-blue-400 hover:text-blue-600">
+                                                                    <Icon name="play" className="w-4 h-4" />
+                                                                </button>
+                                                                <p className="not-italic mt-1 text-gray-400 text-xs">{w.sentTrans}</p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {activeTab === "quiz" && (
+                            <div className="max-w-2xl mx-auto bg-white rounded-3xl p-10 card-shadow border-t-8 border-amber-400">
+                                <div className="flex justify-between items-center mb-8">
+                                    <span className="bg-amber-100 px-4 py-1 rounded-full text-amber-700 font-bold">Question {quizIndex + 1}/{quizQuestions.length}</span>
+                                    <div className="flex items-center gap-2 text-2xl font-black text-green-500">
+                                        <Icon name="star" className="w-6 h-6" /> {score}
+                                    </div>
+                                </div>
+                                <div className="text-center mb-12">
+                                    <h3 className="text-2xl font-bold text-gray-800 mb-6">Which suffix completes this person word?</h3>
+                                    <div className="inline-block px-12 py-6 bg-amber-50 rounded-3xl border-4 border-dashed border-amber-200">
+                                        <span className="text-5xl font-black text-amber-800 tracking-tighter">{quizQuestions[quizIndex].word}</span>
+                                        <p className="text-amber-600 mt-2 font-mono text-sm">Root: {quizQuestions[quizIndex].root}</p>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    {quizQuestions[quizIndex].options.map(opt => (
+                                        <button
+                                            key={opt}
+                                            onClick={() => handleAnswer(opt)}
+                                            className="py-5 rounded-2xl border-2 border-amber-100 bg-amber-50 text-2xl font-bold text-amber-900 hover:bg-amber-600 hover:text-white hover:scale-105 shadow-md active:scale-95 transition-all"
+                                        >
+                                            -{opt}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === "achievements" && (
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                                {[
+                                    {id: "start", label: "探險啟程", desc: "完成測驗第一題", active: score > 0, icon: "star"},
+                                    {id: "half", label: "智慧學者", desc: "得分超過 50 分", active: score >= 50, icon: "play"},
+                                    {id: "full", label: "字尾大師", desc: "完成所有題目", active: quizIndex === quizQuestions.length - 1, icon: "check"},
+                                    {id: "sync", label: "雲端旅人", desc: "同步全體教材", active: pregenStatus.progress === 100, icon: "sync"}
+                                ].map(badge => (
+                                    <div key={badge.id} className={`bg-white rounded-2xl p-8 text-center card-shadow flex flex-col items-center transition-all ${badge.active ? 'opacity-100 scale-100' : 'opacity-40 grayscale scale-95'}`}>
+                                        <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-4 shadow-inner ${badge.active ? 'bg-amber-400 text-white animate-pulse' : 'bg-gray-100 text-gray-300'}`}>
+                                            <Icon name={badge.icon} className="w-10 h-10" />
+                                        </div>
+                                        <h4 className="font-bold text-amber-900">{badge.label}</h4>
+                                        <p className="text-xs text-amber-600/60 mt-2">{badge.desc}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </main>
+
+                    {/* Debug Bar */}
+                    <div className="fixed bottom-0 left-0 w-full bg-slate-900/95 text-white text-[10px] sm:text-xs p-2 flex flex-col sm:flex-row justify-between items-center z-50 backdrop-blur-md border-t border-slate-700">
+                        <div className="flex items-center gap-2 mb-1 sm:mb-0">
+                            <span className="bg-amber-600 px-2 py-0.5 rounded-sm font-bold">SYSTEM</span>
+                            <span className={`font-mono ${debugMsg.includes('❌') ? 'text-red-400' : 'text-amber-200'}`}>{debugMsg}</span>
+                        </div>
+                        <div className="flex items-center gap-4 text-slate-400">
+                            <span>UID: {user?.uid || "Connecting..."}</span>
+                            <span>APP: {appId.substring(0, 8)}...</span>
+                            <span className="hidden sm:inline">CACHE: {Object.keys(mediaCache).length}</span>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
