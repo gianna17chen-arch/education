@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Like Grammar Interactive Course (React Edition)</title>
+    
+    <!-- CSS Dependencies -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&family=Noto+Sans+TC:wght@400;700&display=swap');
+        
+        body { font-family: 'Nunito', 'Noto Sans TC', sans-serif; }
+
+        .animal-bounce { animation: bounce 2s infinite; }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .pop-in { animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        @keyframes popIn {
+            0% { transform: scale(0.9); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+
+    <!-- React Dependencies -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-gradient-to-br from-yellow-100 via-pink-100 to-blue-100 min-h-screen flex items-center justify-center p-4 sm:p-8 relative pb-20">
+
+    <div id="root" class="w-full max-w-4xl"></div>
+
+    <!-- Firebase SDK Setup (Module) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // Mount to window for React to consume
+        window.FB = { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, getFirestore, doc, getDoc, setDoc };
+    </script>
+
+    <!-- React Logic (Babel) -->
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback } = React;
+
+        // --- Configuration ---
+        const apiKey = ""; // Provided by environment runtime
+        const themeId = "grade4-grammar-like-v1"; // Unique theme ID for Firebase cache
+        
+        const firebaseConfig = {
+            apiKey: "AIzaSyBnjfbh1ow4j6gXBP9XeBQkCt_cs7Uv3ds",
+            authDomain: "education-b38d5.firebaseapp.com",
+            projectId: "education-b38d5",
+            storageBucket: "education-b38d5.firebasestorage.app",
+            messagingSenderId: "450320441540",
+            appId: "1:450320441540:web:888014b1380a473a142991",
+            measurementId: "G-70DQ70W0B8"
+        };
+
+        // --- Course Data ---
+        const courseData = {
+            ving: {
+                id: 'ving',
+                title: "Like + V-ing (動名詞)",
+                animal: "🐶 歡樂小狗說：",
+                colorTheme: { bg: "bg-orange-50", border: "border-orange-300", text: "text-orange-700", accent: "bg-orange-400", hover: "hover:border-orange-400" },
+                rule: "當我們使用 <strong class='text-orange-600'>like + V-ing</strong> 時，語氣上更強調 <strong class='bg-yellow-200 px-2 rounded'>「享受該動作本身的過程」</strong> 或 <strong class='bg-yellow-200 px-2 rounded'>「過往的經驗」</strong>。通常用來表達一個人普遍的興趣、愛好（Hobbies）。",
+                examples: [
+                    { id: "ex_ving_1", en: "I like reading books on rainy days.", zh: "我喜歡在下雨天看書。（強調享受看書的過程）", ipa: "/aɪ laɪk ˈriːdɪŋ bʊks ɑːn ˈreɪni deɪz/", tip: "reading 的 -ing 尾音輕輕帶出鼻音。" },
+                    { id: "ex_ving_2", en: "She likes swimming in the ocean.", zh: "她喜歡在海裡游泳。（游泳是她的愛好）", ipa: "/ʃi laɪks ˈswɪmɪŋ ɪn ði ˈoʊʃən/", tip: "swimming 注意中間的 /m/ 音要閉唇。" }
+                ]
+            },
+            tov: {
+                id: 'tov',
+                title: "Like + to V (不定詞)",
+                animal: "🐱 聰明小貓說：",
+                colorTheme: { bg: "bg-blue-50", border: "border-blue-300", text: "text-blue-700", accent: "bg-blue-400", hover: "hover:border-blue-400" },
+                rule: "當我們使用 <strong class='text-blue-600'>like + to V</strong> 時，語氣上偏向 <strong class='bg-yellow-200 px-2 rounded'>「個人的習慣、選擇」</strong>，或者認為 <strong class='bg-yellow-200 px-2 rounded'>「這樣做是好的、對的、有益的」</strong>。它不一定代表你「享受」這個動作，而是你傾向這麼做。",
+                examples: [
+                    { id: "ex_tov_1", en: "I like to keep my desk clean.", zh: "我喜歡保持辦公桌整潔。（認為「保持乾淨」是個好選擇）", ipa: "/aɪ laɪk tə kiːp maɪ dɛsk kliːn/", tip: "to 常常會弱化發成 /tə/ (t-uh)。" },
+                    { id: "ex_tov_2", en: "He likes to arrive early for meetings.", zh: "他喜歡開會早到。（這是一個他選擇的好習慣）", ipa: "/hi laɪks tʊ əˈraɪv ˈɜːrli fɔːr ˈmiːtɪŋz/", tip: "arrive 的 /v/ 要輕咬下嘴唇。" }
+                ]
+            },
+            wouldlike: {
+                id: 'wouldlike',
+                title: "⚠️ 重要特例：Would like",
+                animal: "🐻 貪吃小熊說：",
+                colorTheme: { bg: "bg-pink-50", border: "border-pink-300", text: "text-pink-700", accent: "bg-pink-400", hover: "hover:border-pink-400" },
+                rule: "這是一個非常容易犯錯的考點！當 `like` 前面加上了 `would` 時，意思從「喜歡」變成了 <strong class='bg-yellow-200 px-2 rounded text-red-600 text-xl'>「想要 (want)」</strong>，這時候後面 <strong class='underline decoration-red-500 decoration-wavy'>絕對只能接 to V</strong>，不能接 V-ing。",
+                extraAlert: "<div class='flex gap-4 justify-center mt-4 text-lg'> <div class='text-green-600 font-bold'>⭕️ Would like + to V</div> <div class='text-red-500 font-bold line-through'>❌ Would like + V-ing</div> </div>",
+                examples: [
+                    { id: "ex_would_1", en: "I would like to order a cup of coffee, please.", zh: "我想要點一杯咖啡。", ipa: "/aɪ wʊd laɪk tʊ ˈɔːrdər ə kʌp əv ˈkɔːfi, pliːz/", tip: "I would 常縮寫為 I'd /aɪd/。" }
+                ]
+            },
+            summary: {
+                id: 'summary',
+                title: "💡 教學小總結 (Summary)",
+                animal: "🦉 智慧貓頭鷹說：",
+                colorTheme: { bg: "bg-green-50", border: "border-green-300", text: "text-green-800", accent: "bg-green-500", hover: "hover:border-green-400" },
+                rule: "讓我們來快速複習一下今天學到的三個重要觀念吧！",
+                isSummary: true,
+                examples: []
+            }
+        };
+
+        // --- Utility Functions ---
+        const getSafeId = (text) => btoa(unescape(encodeURIComponent(text))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+        // PCM to WAV converter (Standard 44-byte Header)
+        function pcmToWav(pcmData, sampleRate = 24000) {
+            const numChannels = 1;
+            const bitsPerSample = 16;
+            const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
+            const blockAlign = numChannels * (bitsPerSample / 8);
+            const dataSize = pcmData.length;
+            const buffer = new ArrayBuffer(44 + dataSize);
+            const view = new DataView(buffer);
+
+            const writeString = (offset, string) => {
+                for (let i = 0; i < string.length; i++) {
+                    view.setUint8(offset + i, string.charCodeAt(i));
+                }
+            };
+
+            writeString(0, 'RIFF');
+            view.setUint32(4, 36 + dataSize, true);
+            writeString(8, 'WAVE');
+            writeString(12, 'fmt ');
+            view.setUint32(16, 16, true); // Subchunk1Size (16 for PCM)
+            view.setUint16(20, 1, true);  // AudioFormat (1 for PCM)
+            view.setUint16(22, numChannels, true);
+            view.setUint32(24, sampleRate, true); // SampleRate at Offset 24
+            view.setUint32(28, byteRate, true);
+            view.setUint16(32, blockAlign, true);
+            view.setUint16(34, bitsPerSample, true);
+            writeString(36, 'data');
+            view.setUint32(40, dataSize, true);
+
+            const pcmView = new Uint8Array(pcmData);
+            const outView = new Uint8Array(buffer, 44);
+            outView.set(pcmView);
+
+            const blob = new Blob([buffer], { type: 'audio/wav' });
+            return URL.createObjectURL(blob);
+        }
+
+        // Native TTS Fallback
+        const playNativeTTS = (text) => {
+            return new Promise((resolve) => {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-US';
+                utterance.rate = 0.9;
+                
+                const voices = window.speechSynthesis.getVoices();
+                const englishVoice = voices.find(v => v.lang === 'en-US' && v.name.includes('Google')) || voices.find(v => v.lang === 'en-US');
+                if (englishVoice) utterance.voice = englishVoice;
+                
+                utterance.onend = () => resolve();
+                utterance.onerror = () => resolve();
+                window.speechSynthesis.speak(utterance);
+            });
+        };
+
+        // --- Main Application Component ---
+        const App = () => {
+            const [view, setView] = useState('toc'); // 'toc' or section id
+            const [fbReady, setFbReady] = useState(false);
+            const [db, setDb] = useState(null);
+            const [user, setUser] = useState(null);
+            const [debugMsg, setDebugMsg] = useState("Initializing Setup...");
+            
+            const [playingId, setPlayingId] = useState(null);
+            const [audioStatus, setAudioStatus] = useState({}); // { id: 'loading' | 'cached' }
+            
+            const [isPreloading, setIsPreloading] = useState(false);
+            const [preloadProgress, setPreloadProgress] = useState(0);
+
+            // 1. Firebase Polling & Initialization
+            useEffect(() => {
+                let intervalId;
+                const initFirebase = async () => {
+                    try {
+                        const app = window.FB.initializeApp(firebaseConfig);
+                        const auth = window.FB.getAuth(app);
+                        const firestore = window.FB.getFirestore(app);
+                        
+                        setDb(firestore);
+                        window.FB.onAuthStateChanged(auth, (usr) => {
+                            if (usr) {
+                                setUser(usr);
+                                setFbReady(true);
+                                setDebugMsg("✅ Firebase Ready (Anonymous Logged In)");
+                            } else {
+                                window.FB.signInAnonymously(auth).catch(err => setDebugMsg("❌ Auth Error: " + err.message));
+                            }
+                        });
+                    } catch (err) {
+                        setDebugMsg("❌ Firebase Init Error: " + err.message);
+                    }
+                };
+
+                intervalId = setInterval(() => {
+                    if (window.FB && window.FB.initializeApp) {
+                        clearInterval(intervalId);
+                        initFirebase();
+                    }
+                }, 100);
+
+                return () => clearInterval(intervalId);
+            }, []);
+
+            // Handle API call with Backoff
+            const fetchTTSWithBackoff = async (text, retries = 5) => {
+                const payload = {
+                    contents: [{ parts: [{ text: `Say clearly and naturally: ${text}` }] }],
+                    generationConfig: {
+                        responseModalities: ["AUDIO"],
+                        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } } }
+                    },
+                    model: "gemini-2.5-flash-preview-tts"
+                };
+
+                let attempt = 0;
+                while (attempt < retries) {
+                    try {
+                        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        
+                        if (!response.ok) {
+                            if (response.status === 403 && !apiKey) {
+                                throw new Error("API 403: 金鑰遺失或無效");
+                            }
+                            throw new Error(`HTTP ${response.status}`);
+                        }
+                        
+                        const data = await response.json();
+                        const base64Audio = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+                        if (!base64Audio || base64Audio.length < 100) throw new Error("Invalid audio data length");
+                        
+                        return base64Audio;
+                    } catch (error) {
+                        attempt++;
+                        setDebugMsg(`⚠️ TTS API 失敗 (${attempt}/${retries}): ${error.message}`);
+                        if (attempt >= retries) throw error;
+                        await sleep(Math.pow(2, attempt) * 1000);
+                    }
+                }
+            };
+
+            // Audio Generation/Playback Logic (Cloud Cache First)
+            const handlePlayAudio = async (text, id) => {
+                if (playingId) return; // Prevent concurrent play
+                
+                setPlayingId(id);
+                setAudioStatus(prev => ({ ...prev, [id]: 'loading' }));
+                
+                const safeId = getSafeId(text);
+                let audioWavUrl = null;
+
+                try {
+                    // Check DB Ready
+                    if (!db || !user) throw new Error("Database not ready");
+
+                    // 1. Check Cloud Cache
+                    const docRef = window.FB.doc(db, 'artifacts', themeId, 'public', 'data', 'audio', safeId);
+                    const docSnap = await window.FB.getDoc(docRef);
+
+                    if (docSnap.exists()) {
+                        setDebugMsg(`✅ 讀取雲端快取: ${text.substring(0, 10)}...`);
+                        setAudioStatus(prev => ({ ...prev, [id]: 'cached' }));
+                        const base64Data = docSnap.data().base64;
+                        const binaryStr = atob(base64Data);
+                        const buffer = new Uint8Array(binaryStr.length);
+                        for (let i = 0; i < binaryStr.length; i++) buffer[i] = binaryStr.charCodeAt(i);
+                        audioWavUrl = pcmToWav(buffer.buffer);
+                    } else {
+                        // 2. Generate via API
+                        setDebugMsg(`⏳ 發送生成請求 API: ${text.substring(0, 10)}...`);
+                        const base64Audio = await fetchTTSWithBackoff(text);
+                        
+                        // 3. Save to Cache
+                        await window.FB.setDoc(docRef, {
+                            text: text,
+                            base64: base64Audio,
+                            timestamp: new Date().toISOString(),
+                            createdBy: user.uid
+                        });
+                        setDebugMsg(`💾 已儲存至快取: ${text.substring(0, 10)}...`);
+                        
+                        const binaryStr = atob(base64Audio);
+                        const buffer = new Uint8Array(binaryStr.length);
+                        for (let i = 0; i < binaryStr.length; i++) buffer[i] = binaryStr.charCodeAt(i);
+                        audioWavUrl = pcmToWav(buffer.buffer);
+                    }
+
+                    // 4. Play Audio
+                    const audio = new Audio(audioWavUrl);
+                    audio.onended = () => {
+                        setPlayingId(null);
+                        setAudioStatus(prev => ({ ...prev, [id]: null }));
+                    };
+                    audio.play();
+
+                } catch (err) {
+                    setDebugMsg(`⚠️ 雲端/API發生錯誤，啟用本機語音備援: ${err.message}`);
+                    await playNativeTTS(text);
+                    setPlayingId(null);
+                    setAudioStatus(prev => ({ ...prev, [id]: null }));
+                }
+            };
+
+            // Preload All Logic
+            const handlePreload = async () => {
+                if (isPreloading || !db || !user) return;
+                setIsPreloading(true);
+                setPreloadProgress(0);
+                
+                const allExamples = [];
+                Object.values(courseData).forEach(section => {
+                    if (section.examples) {
+                        section.examples.forEach(ex => allExamples.push(ex));
+                    }
+                });
+
+                const total = allExamples.length;
+                let completed = 0;
+
+                for (const ex of allExamples) {
+                    setDebugMsg(`🔄 預載中: ${ex.en.substring(0, 15)}...`);
+                    const safeId = getSafeId(ex.en);
+                    try {
+                        const docRef = window.FB.doc(db, 'artifacts', themeId, 'public', 'data', 'audio', safeId);
+                        const docSnap = await window.FB.getDoc(docRef);
+                        
+                        if (!docSnap.exists()) {
+                            const base64Audio = await fetchTTSWithBackoff(ex.en);
+                            await window.FB.setDoc(docRef, {
+                                text: ex.en,
+                                base64: base64Audio,
+                                timestamp: new Date().toISOString(),
+                                createdBy: user.uid
+                            });
+                        }
+                    } catch(err) {
+                        console.error("Preload error for", ex.en, err);
+                    }
+                    completed++;
+                    setPreloadProgress(Math.round((completed / total) * 100));
+                }
+                
+                setDebugMsg("✨ 一鍵預載與雲端偵測完成！");
+                setTimeout(() => setIsPreloading(false), 2000);
+            };
+
+            return (
+                <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl w-full overflow-hidden border-4 border-white pop-in relative pb-10">
+                    
+                    {/* Header */}
+                    <header className="bg-gradient-to-r from-yellow-300 to-orange-300 p-6 text-center relative shadow-md">
+                        <h1 className="text-3xl sm:text-4xl font-black text-white drop-shadow-md tracking-wide flex justify-center items-center gap-3">
+                            <i className="fas fa-stars text-yellow-100"></i>
+                            ✨ 英文文法探險：Like 的秘密 ✨
+                        </h1>
+                        
+                        {view !== 'toc' && (
+                            <button 
+                                onClick={() => setView('toc')}
+                                className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-white text-orange-500 font-bold py-2 px-4 rounded-full shadow hover:scale-105 hover:bg-orange-50 transition duration-300 z-10">
+                                <i className="fas fa-home mr-2"></i>回目錄
+                            </button>
+                        )}
+                    </header>
+
+                    <main className="p-6 sm:p-10 min-h-[500px]">
+                        
+                        {/* Preload Button Section */}
+                        {view === 'toc' && (
+                            <div className="flex justify-end mb-4">
+                                <button 
+                                    onClick={handlePreload}
+                                    disabled={isPreloading || !fbReady}
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm shadow transition-all ${
+                                        isPreloading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                                    }`}>
+                                    {isPreloading ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-cloud-download-alt"></i>}
+                                    {isPreloading ? `預載中 ${preloadProgress}%` : '一鍵雲端偵測與預載音檔'}
+                                </button>
+                            </div>
+                        )}
+
+                        {/* TOC View */}
+                        {view === 'toc' && (
+                            <div id="tocView" className="block pop-in">
+                                <div className="text-center mb-8 text-gray-600 text-lg">
+                                    <p>歡迎來到文法探險樂園！請選擇你想學習的動物島嶼：</p>
+                                </div>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    {[courseData.ving, courseData.tov, courseData.wouldlike].map((sec, idx) => (
+                                        <button 
+                                            key={sec.id}
+                                            onClick={() => setView(sec.id)} 
+                                            className={`group relative ${sec.colorTheme.bg} border-4 ${sec.colorTheme.border} rounded-2xl p-6 text-center hover:shadow-xl hover:-translate-y-2 transition-all duration-300 cursor-pointer ${sec.colorTheme.hover}`}>
+                                            <div className="text-6xl mb-4 animal-bounce" style={{animationDelay: `${idx * 0.2}s`}}>
+                                                {sec.animal.split(' ')[0]}
+                                            </div>
+                                            <h2 className={`text-2xl font-bold ${sec.colorTheme.text} mb-2`}>{sec.title}</h2>
+                                            <p className={`opacity-80 font-semibold transition ${sec.colorTheme.text}`}>
+                                                {sec.id === 'ving' ? "動名詞島嶼 (享受過程)" : sec.id === 'tov' ? "不定詞島嶼 (習慣選擇)" : "願望島嶼 (現在想要)"}
+                                            </p>
+                                            <div className={`absolute -top-3 -right-3 ${sec.colorTheme.accent} text-white rounded-full w-8 h-8 flex items-center justify-center font-bold shadow-lg group-hover:scale-110 transition`}>{idx + 1}</div>
+                                        </button>
+                                    ))}
+                                </div>
+
+                                <div className="mt-10 text-center">
+                                    <button 
+                                        onClick={() => setView('summary')} 
+                                        className="bg-green-100 text-green-700 border-2 border-green-300 font-bold py-3 px-8 rounded-full shadow-sm hover:bg-green-200 hover:shadow-md transition-all duration-300">
+                                        <i className="fas fa-lightbulb text-yellow-500 mr-2"></i> 觀看教學總結
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Detail View */}
+                        {view !== 'toc' && (
+                            <div id="detailView" className="block pop-in">
+                                {(() => {
+                                    const data = courseData[view];
+                                    return (
+                                        <>
+                                            <div className={`${data.colorTheme.bg} border-4 ${data.colorTheme.border} rounded-2xl p-6 mb-8 relative`}>
+                                                <div className={`absolute -top-8 -left-4 text-5xl animal-bounce bg-white rounded-full shadow-lg p-2 border-2 ${data.colorTheme.border}`}>
+                                                    {data.animal.split(' ')[0]}
+                                                </div>
+                                                <h2 className={`text-3xl font-black ${data.colorTheme.text} mb-4 text-center ml-10`}>{data.title}</h2>
+                                                <p 
+                                                    className={`text-lg text-gray-700 leading-relaxed border-t-2 ${data.colorTheme.border} border-dashed pt-4`}
+                                                    dangerouslySetInnerHTML={{ __html: `<span class="font-bold">${data.animal.split(' ')[1]}</span> ${data.rule}` }}
+                                                />
+                                                {data.extraAlert && <div dangerouslySetInnerHTML={{ __html: data.extraAlert }} />}
+                                            </div>
+
+                                            {data.isSummary ? (
+                                                <div className="space-y-4">
+                                                    <div className="bg-white border-2 border-orange-200 p-4 rounded-xl shadow flex items-center gap-4">
+                                                        <div className="text-4xl">🐶</div>
+                                                        <div>
+                                                            <h3 className="font-bold text-orange-600 text-xl">Like V-ing</h3>
+                                                            <p className="text-gray-600">Enjoying the experience (享受過程，談論興趣)</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="bg-white border-2 border-blue-200 p-4 rounded-xl shadow flex items-center gap-4">
+                                                        <div className="text-4xl">🐱</div>
+                                                        <div>
+                                                            <h3 className="font-bold text-blue-600 text-xl">Like to V</h3>
+                                                            <p className="text-gray-600">Making a good choice/habit (習慣選擇，認為是好事)</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="bg-white border-2 border-pink-200 p-4 rounded-xl shadow flex items-center gap-4">
+                                                        <div className="text-4xl">🐻</div>
+                                                        <div>
+                                                            <h3 className="font-bold text-pink-600 text-xl">Would like to V</h3>
+                                                            <p className="text-gray-600">Wanting something right now (現在想要)</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center"><i className="fas fa-book-open text-gray-500 mr-2"></i> 實用例句與發音</h3>
+                                                    <div className="space-y-6">
+                                                        {data.examples.map(ex => (
+                                                            <div key={ex.id} className={`bg-white p-5 rounded-xl shadow-md border-l-8 ${data.colorTheme.border} hover:shadow-lg transition`}>
+                                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                                                    <div className="flex-1">
+                                                                        <div className="text-xl font-bold text-gray-800 mb-1">{ex.en}</div>
+                                                                        <div className="text-gray-600 mb-2">{ex.zh}</div>
+                                                                        <div className="bg-gray-100 inline-block px-3 py-1 rounded text-sm text-gray-500 font-mono mb-2">
+                                                                            <i className="fas fa-volume-up mr-1 opacity-50"></i>{ex.ipa}
+                                                                        </div>
+                                                                        <div className="text-sm text-amber-600 bg-amber-50 px-3 py-2 rounded-lg">
+                                                                            <i className="fas fa-lightbulb mr-1"></i><strong>發音提示：</strong>{ex.tip}
+                                                                        </div>
+                                                                    </div>
+                                                                    
+                                                                    <div className="flex flex-col items-center gap-2">
+                                                                        {audioStatus[ex.id] === 'cached' && <span className="text-xs font-bold text-green-600 bg-green-100 px-2 rounded-full">✅ 已快取</span>}
+                                                                        <button 
+                                                                            onClick={() => handlePlayAudio(ex.en, ex.id)}
+                                                                            disabled={playingId === ex.id}
+                                                                            className={`${data.colorTheme.accent} hover:opacity-80 text-white p-4 rounded-full shadow-md flex-shrink-0 transition transform focus:outline-none focus:ring-4 focus:ring-opacity-50 flex items-center justify-center h-16 w-16 group ${playingId === ex.id ? 'animate-pulse' : 'hover:scale-110'}`}>
+                                                                            {audioStatus[ex.id] === 'loading' ? (
+                                                                                <i className="fas fa-spinner fa-spin text-2xl"></i>
+                                                                            ) : playingId === ex.id ? (
+                                                                                <i className="fas fa-volume-up text-2xl"></i>
+                                                                            ) : (
+                                                                                <i className="fas fa-play text-2xl"></i>
+                                                                            )}
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </>
+                                            )}
+                                        </>
+                                    );
+                                })()}
+                            </div>
+                        )}
+                    </main>
+
+                    {/* Fixed Debug Bar */}
+                    <div className="fixed bottom-0 left-0 w-full bg-gray-800 text-green-400 font-mono text-xs p-2 z-50 overflow-x-hidden flex items-center justify-between shadow-[0_-2px_10px_rgba(0,0,0,0.5)]">
+                        <div className="flex items-center gap-2 truncate">
+                            <i className="fas fa-terminal text-gray-400"></i>
+                            <span className="truncate">{debugMsg}</span>
+                        </div>
+                        <div className="flex gap-2 shrink-0">
+                            <span className={`px-2 py-0.5 rounded ${fbReady ? 'bg-green-700/50 text-green-200' : 'bg-red-700/50 text-red-200'}`}>
+                                DB: {fbReady ? 'Ready' : 'Wait'}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
