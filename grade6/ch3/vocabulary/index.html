@@ -1,554 +1,495 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>時間單字大冒險 (Cloud Sync Edition)</title>
-    <!-- 載入基礎庫 -->
+    <title>Space Time Traveler - Grade 6 Vocab</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & Babel -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- 字體與圖標 -->
-    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
     <style>
-        body { font-family: 'Fredoka', 'Noto Sans TC', sans-serif; background-color: #f0fdf4; overflow-x: hidden; }
-        .debug-bar { font-family: monospace; font-size: 12px; z-index: 9999; }
-        .slide-transition { transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
-        .input-practice { text-transform: lowercase; }
-        .glass-card { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); }
-        .progress-bar-fill { transition: width 0.3s ease; }
-        .animate-fade-in { animation: fadeIn 0.5s ease-in-out; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap');
+        body { font-family: 'Nunito', 'PingFang TC', sans-serif; background-color: #fdf6f9; }
+        .macaron-blue { background-color: #e0f2fe; }
+        .macaron-pink { background-color: #fce7f3; }
+        .macaron-purple { background-color: #f3e8ff; }
+        .macaron-yellow { background-color: #fef9c3; }
+        .macaron-green { background-color: #dcfce7; }
+        .glass-card { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.4); }
+        .shadow-soft { box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05); }
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+        .float-anim { animation: float 4s ease-in-out infinite; }
     </style>
 </head>
-<body>
+<body class="text-slate-700">
+    <div id="root"></div>
 
-<div id="root"></div>
+    <!-- Firebase SDK - Critical Placement -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        window.FB = { 
+            initializeApp, getAuth, signInAnonymously, onAuthStateChanged, 
+            getFirestore, doc, getDoc, setDoc, collection 
+        };
+    </script>
 
-<!-- Firebase SDK 載入模組 (核心規則) -->
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, doc, getDoc, setDoc, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-    
-    // 將功能掛載到 window.FB
-    window.FB = { 
-        initializeApp, getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken,
-        getFirestore, doc, getDoc, setDoc, collection 
-    };
-</script>
+    <!-- React Application Logic -->
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo, Fragment } = React;
 
-<!-- React 應用程式邏輯 -->
-<script type="text/babel">
-    const { useState, useEffect, useRef, useMemo } = React;
-
-    // --- 設定與常數 ---
-    const themeId = "grade4-phonics";
-    const apiKey = ""; // 由環境自動注入
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'education-b38d5';
-    const firebaseConfig = {
-        apiKey: "AIzaSyBnjfbh1ow4j6gXBP9XeBQkCt_cs7Uv3ds",
-        authDomain: "education-b38d5.firebaseapp.com",
-        projectId: "education-b38d5",
-        storageBucket: "education-b38d5.firebasestorage.app",
-        messagingSenderId: "450320441540",
-        appId: "1:450320441540:web:888014b1380a473a142991",
-        measurementId: "G-70DQ70W0B8"
-    };
-
-    // --- 工具函式：Safe ID 編碼 ---
-    const getSafeId = (text) => {
-        try {
-            return btoa(unescape(encodeURIComponent(text))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-        } catch (e) {
-            return text.replace(/[^a-z0-9]/gi, '_');
-        }
-    };
-
-    // --- 工具函式：PCM 轉 WAV ---
-    const pcmToWav = (pcmData, sampleRate = 24000) => {
-        const header = new ArrayBuffer(44);
-        const view = new DataView(header);
-        const length = pcmData.byteLength;
-
-        const writeString = (offset, string) => {
-            for (let i = 0; i < string.length; i++) {
-                view.setUint8(offset + i, string.charCodeAt(i));
-            }
+        // Configuration
+        const themeId = "grade6-time-space-explorer";
+        const firebaseConfig = {
+            apiKey: "AIzaSyBnjfbh1ow4j6gXBP9XeBQkCt_cs7Uv3ds",
+            authDomain: "education-b38d5.firebaseapp.com",
+            projectId: "education-b38d5",
+            storageBucket: "education-b38d5.firebasestorage.app",
+            messagingSenderId: "450320441540",
+            appId: "1:450320441540:web:888014b1380a473a142991",
+            measurementId: "G-70DQ70W0B8"
         };
 
-        writeString(0, 'RIFF');
-        view.setUint32(4, 36 + length, true);
-        writeString(8, 'WAVE');
-        writeString(12, 'fmt ');
-        view.setUint32(16, 16, true);
-        view.setUint16(20, 1, true); // PCM format
-        view.setUint16(22, 1, true); // Mono
-        view.setUint32(24, sampleRate, true);
-        view.setUint32(28, sampleRate * 2, true);
-        view.setUint16(32, 2, true);
-        view.setUint16(34, 16, true);
-        writeString(36, 'data');
-        view.setUint32(40, length, true);
+        // Icon Component Definitions
+        const StarIcon = ({ className }) => <svg className={className} fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14l-5-4.87 6.91-1.01L12 2z"/></svg>;
+        const RocketIcon = ({ className }) => <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M15.5 8.5c1.2 1.2 1.5 3.5 1.5 3.5s-2.3.3-3.5 1.5c-1.2 1.2-1.5 3.5-1.5 3.5s-2.3.3-3.5 1.5c-1.2 1.2-1.5 3.5-1.5 3.5s2.3.3-3.5 1.5M10 14l-4 4M21 3s-3 0-6 3M3 21s0-3 3-6M14 10l7-7" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+        const PlanetIcon = ({ className }) => <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><circle cx="12" cy="12" r="9"/><path d="M3.6 9c1.5 1.5 4.5 2 6 2s4.5-1.5 6-1.5 4.5.5 5 1.5" strokeLinecap="round"/></svg>;
+        const AudioIcon = ({ className }) => <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M11 5L6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 010 7.07" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+        const CheckIcon = ({ className }) => <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round"/></svg>;
 
-        const blob = new Blob([header, pcmData], { type: 'audio/wav' });
-        return URL.createObjectURL(blob);
-    };
+        const App = () => {
+            const [db, setDb] = useState(null);
+            const [user, setUser] = useState(null);
+            const [debugMsg, setDebugMsg] = useState("系統初始化中...");
+            const [batchLoading, setBatchLoading] = useState(false);
+            const [progress, setProgress] = useState(0);
+            const [currentView, setCurrentView] = useState('learn'); // learn, quiz
+            const [vocabData, setVocabData] = useState([]);
+            
+            // Quiz states
+            const [quizIndex, setQuizIndex] = useState(0);
+            const [score, setScore] = useState(0);
+            const [quizEnd, setQuizEnd] = useState(false);
 
-    // --- 工具函式：API 指數退避重試 ---
-    const fetchWithRetry = async (url, options, retries = 5, backoff = 1000) => {
-        try {
-            const response = await fetch(url, options);
-            if (!response.ok) {
-                if (response.status === 403 && !apiKey) throw new Error("AUTH_MISSING");
-                throw new Error(`HTTP_${response.status}`);
-            }
-            return await response.json();
-        } catch (err) {
-            if (retries > 0 && err.message !== "AUTH_MISSING") {
-                await new Promise(r => setTimeout(r, backoff));
-                return fetchWithRetry(url, options, retries - 1, backoff * 2);
-            }
-            throw err;
-        }
-    };
+            const initialWords = useMemo(() => [
+                { id: "w1", word: "day", zh: "白晝/天", sentence: "The sun shines in the sky during the day.", sentenceZh: "白天時太陽在天空閃耀。" },
+                { id: "w2", word: "night", zh: "夜晚", sentence: "Stars come out when it is night.", sentenceZh: "夜晚時星星會出現。" },
+                { id: "w3", word: "hour", zh: "小時", sentence: "There are sixty minutes in one hour.", sentenceZh: "一小時有六十分鐘。" },
+                { id: "w4", word: "yesterday", zh: "昨天", sentence: "I finished my homework yesterday.", sentenceZh: "我昨天完成了功課。" },
+                { id: "w5", word: "tomorrow", zh: "明天", sentence: "We will go on a trip tomorrow.", sentenceZh: "我們明天要去旅行。" },
+                { id: "w6", word: "two days ago", zh: "兩天前", sentence: "I visited my grandma two days ago.", sentenceZh: "我兩天前去看了奶奶。" },
+                { id: "w7", word: "an hour ago", zh: "一小時前", sentence: "He left the house an hour ago.", sentenceZh: "他一小時前離開了家。" },
+                { id: "w8", word: "two hours ago", zh: "兩小時前", sentence: "The movie started two hours ago.", sentenceZh: "電影兩小時前開始了。" },
+                { id: "w9", word: "was", zh: "是(過去單數)", sentence: "The weather was very cold this morning.", sentenceZh: "今天早上天氣非常冷。" },
+                { id: "w10", word: "were", zh: "是(過去複數)", sentence: "They were at the park last Sunday.", sentenceZh: "他們上週日在公園。" }
+            ], []);
 
-    // --- React 元件：App ---
-    const App = () => {
-        const [db, setDb] = useState(null);
-        const [user, setUser] = useState(null);
-        const [debugMsg, setDebugMsg] = useState("正在啟動系統...");
-        const [currentSlide, setCurrentSlide] = useState(0);
-        const [mediaCache, setMediaCache] = useState({}); // { wordId: { image, audio } }
-        const [batchProgress, setBatchProgress] = useState(null); // null or 0-100
-        const [slideStatus, setSlideStatus] = useState({}); // { index: { heard, typed } }
-        const [modalConfig, setModalConfig] = useState(null); // { title, text, icon }
+            useEffect(() => {
+                // Initialize internal data structure
+                setVocabData(initialWords.map(w => ({
+                    ...w,
+                    img: null,
+                    imgStatus: 'idle',
+                    audioStatus: 'idle'
+                })));
 
-        const wordsData = useMemo(() => [
-            { word: 'day', translation: '白天 / 一天', example: 'The sun shines during the day.', exampleCn: '太陽在白天閃耀。', trivia: '地球轉一圈就是一個 Day，大約是 24 小時喔！', color: '#4ade80' },
-            { word: 'night', translation: '夜晚', example: 'Stars come out at night.', exampleCn: '星星在晚上出來了。', trivia: '夜晚是貓頭鷹最活躍的時候，牠們是夜行性動物喔！', color: '#38bdf8' },
-            { word: 'yesterday', translation: '昨天', example: 'I played soccer yesterday.', exampleCn: '我昨天踢了足球。', trivia: 'Yesterday 原本是指過去的那一天！', color: '#fb7185' },
-            { word: 'today', translation: '今天', example: 'Today is a sunny day.', exampleCn: '今天是一個晴朗的日子。', trivia: 'Today 很久以前寫作 to-day 喔！', color: '#facc15' },
-            { word: 'tonight', translation: '今晚', example: 'I will sleep early tonight.', exampleCn: '我今晚會早點睡覺。', trivia: 'Tonight 通常指太陽下山後到睡覺前的時間。', color: '#818cf8' },
-            { word: 'tomorrow', translation: '明天', example: 'Tomorrow is another day.', exampleCn: '明天又是新的一天。', trivia: 'Tomorrow 意思是「到下一個早晨」。', color: '#fb923c' },
-            { word: 'hour', translation: '小時', example: 'An hour has sixty minutes.', exampleCn: '一小時有六十分鐘。', trivia: '注意！"hour" 的 h 是不發音的，要從 o 開始唸！', color: '#f472b6' }
-        ], []);
+                // Firebase Ready Polling
+                const timer = setInterval(() => {
+                    if (window.FB) {
+                        clearInterval(timer);
+                        const app = window.FB.initializeApp(firebaseConfig);
+                        const auth = window.FB.getAuth(app);
+                        const firestore = window.FB.getFirestore(app);
+                        setDb(firestore);
 
-        const quizData = [
-            { q: "哪一個單字代表「明天」？", options: ["Tomorrow", "Tonight", "Today", "Yesterday"], correct: 0 },
-            { q: "哪一個單字的第一個字母 H 「不發音」？", options: ["House", "Happy", "Hour", "Hello"], correct: 2 },
-            { q: "如果要說「昨天」我做了什麼，要用哪一個字？", options: ["Today", "Yesterday", "Tomorrow", "Tonight"], correct: 1 },
-            { q: "「今晚」的星星很漂亮。今晚是？", options: ["Tonight", "Night", "Today", "Hour"], correct: 0 },
-            { q: "太陽通常在什麼時候出來？", options: ["Night", "Hour", "Tonight", "Day"], correct: 3 }
-        ];
-
-        // --- Firebase 初始化 ---
-        useEffect(() => {
-            const timer = setInterval(() => {
-                if (window.FB) {
-                    clearInterval(timer);
-                    const fbApp = window.FB.initializeApp(firebaseConfig);
-                    const fbAuth = window.FB.getAuth(fbApp);
-                    const fbDb = window.FB.getFirestore(fbApp);
-                    setDb(fbDb);
-
-                    const initAuth = async () => {
-                        try {
-                            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                                await window.FB.signInWithCustomToken(fbAuth, __initial_auth_token);
+                        window.FB.onAuthStateChanged(auth, async (u) => {
+                            if (u) {
+                                setUser(u);
+                                setDebugMsg(`✅ 系統已就緒 (UID: ${u.uid})`);
                             } else {
-                                await window.FB.signInAnonymously(fbAuth);
+                                try {
+                                    await window.FB.signInAnonymously(auth);
+                                } catch (e) {
+                                    setDebugMsg(`❌ 匿名登入失敗: ${e.message}`);
+                                }
                             }
-                        } catch (e) {
-                            setDebugMsg("登入失敗: " + e.message);
-                        }
-                    };
-                    initAuth();
-                    window.FB.onAuthStateChanged(fbAuth, (u) => {
-                        if (u) {
-                            setUser(u);
-                            setDebugMsg(`已連線：${u.uid.substring(0,8)}...`);
-                        }
-                    });
-                }
-            }, 500);
-            return () => clearInterval(timer);
-        }, []);
+                        });
+                    }
+                }, 500);
+                return () => clearInterval(timer);
+            }, []);
 
-        // --- 核心邏輯：媒體快取與生成 ---
-        const processMedia = async (wordObj, forceGenerate = false) => {
-            if (!db || !user) {
-                setDebugMsg("系統尚未就緒，請稍後再試。");
-                return null;
-            }
-            const wordId = getSafeId(wordObj.word);
-            setDebugMsg(`正在檢查 ${wordObj.word} 的雲端快取...`);
+            const getSafeId = (text) => {
+                return btoa(unescape(encodeURIComponent(text))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+            };
 
-            // 1. 檢查 Firestore 快取
-            const imgRef = window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'images', wordId);
-            const audRef = window.FB.doc(db, 'artifacts', appId, 'public', 'data', 'audio', wordId);
-            
-            let cachedImg = null;
-            let cachedAud = null;
-
-            try {
-                const [imgSnap, audSnap] = await Promise.all([
-                    window.FB.getDoc(imgRef),
-                    window.FB.getDoc(audRef)
-                ]);
-                if (imgSnap.exists()) cachedImg = imgSnap.data().url;
-                if (audSnap.exists()) cachedAud = audSnap.data().url;
-            } catch (e) {
-                setDebugMsg(`讀取快取錯誤: ${e.message}`);
-            }
-
-            // 2. 若無快取或強制生成 -> 呼叫 API
-            let finalImg = cachedImg;
-            let finalAud = cachedAud;
-
-            if (!finalImg || forceGenerate) {
-                try {
-                    setDebugMsg(`正在生成插圖：${wordObj.word}...`);
-                    const result = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`, {
-                        method: 'POST',
-                        body: JSON.stringify({ instances: [{ prompt: `Child-friendly cartoon style, clear illustration of ${wordObj.word}, bright colors, high quality, white background` }], parameters: { sampleCount: 1 } })
-                    });
-                    const rawBase64 = result.predictions[0].bytesBase64Encoded;
-                    finalImg = await compressImage(`data:image/png;base64,${rawBase64}`);
-                    await window.FB.setDoc(imgRef, { url: finalImg, timestamp: Date.now() });
-                    setDebugMsg(`✅ 插圖生成成功並已快取`);
-                } catch (e) {
-                    setDebugMsg(`插圖失敗: ${e.message === 'AUTH_MISSING' ? '未授權' : e.message}`);
-                }
-            } else {
-                setDebugMsg(`✅ 插圖已從雲端讀取`);
-            }
-
-            if (!finalAud || forceGenerate) {
-                try {
-                    setDebugMsg(`正在生成語音：${wordObj.word}...`);
-                    const result = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`, {
-                        method: 'POST',
-                        body: JSON.stringify({
-                            contents: [{ parts: [{ text: `Say clearly: ${wordObj.word}. ${wordObj.example}` }] }],
-                            generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } } }
-                        })
-                    });
-                    const pcmBase64 = result.candidates[0].content.parts[0].inlineData.data;
-                    const binary = atob(pcmBase64);
-                    const bytes = new Uint8Array(binary.length);
-                    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-                    finalAud = pcmToWav(bytes.buffer);
-                } catch (e) {
-                    setDebugMsg(`語音失敗: ${e.message === 'AUTH_MISSING' ? '未授權' : e.message}`);
-                    finalAud = 'speechSynthesis';
-                }
-            } else {
-                setDebugMsg(`✅ 語音已就緒`);
-            }
-
-            const mediaData = { image: finalImg, audio: finalAud };
-            setMediaCache(prev => ({ ...prev, [wordId]: mediaData }));
-            return mediaData;
-        };
-
-        const compressImage = (base64) => {
-            return new Promise((resolve) => {
-                const img = new Image();
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    const scale = 512 / img.width;
-                    canvas.width = 512;
-                    canvas.height = img.height * scale;
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    resolve(canvas.toDataURL('image/jpeg', 0.7));
-                };
-                img.src = base64;
-            });
-        };
-
-        // --- 批量預載 ---
-        const startBatchProcess = async () => {
-            if (!db || !user) {
-                setDebugMsg("系統連線中，請稍後再試。");
-                return;
-            }
-            setBatchProgress(0);
-            for (let i = 0; i < wordsData.length; i++) {
-                await processMedia(wordsData[i]);
-                setBatchProgress(Math.round(((i + 1) / wordsData.length) * 100));
-            }
-            setTimeout(() => setBatchProgress(null), 1000);
-            setDebugMsg("✅ 所有單字已完成雲端同步");
-        };
-
-        const playMedia = (wordObj) => {
-            const wordId = getSafeId(wordObj.word);
-            const media = mediaCache[wordId];
-            if (!media || !media.audio) {
-                processMedia(wordObj).then(m => {
-                    if (m) playMediaLogic(m, wordObj, wordId);
-                });
-            } else {
-                playMediaLogic(media, wordObj, wordId);
-            }
-        };
-
-        const playMediaLogic = (media, wordObj, wordId) => {
-            if (!media || !media.audio) return;
-            
-            if (media.audio === 'speechSynthesis') {
-                const u = new SpeechSynthesisUtterance(`${wordObj.word}. ${wordObj.example}`);
-                u.lang = 'en-US';
-                u.onend = () => markHeard(wordId);
-                window.speechSynthesis.speak(u);
-            } else {
-                const audio = new Audio(media.audio);
-                audio.onended = () => markHeard(wordId);
-                audio.play().catch(e => {
-                    console.error("Playback failed", e);
-                    // Fallback to TTS if blob fails
-                    const u = new SpeechSynthesisUtterance(`${wordObj.word}. ${wordObj.example}`);
-                    u.lang = 'en-US';
-                    u.onend = () => markHeard(wordId);
-                    window.speechSynthesis.speak(u);
-                });
-            }
-        };
-
-        const markHeard = (wordId) => {
-            const idx = wordsData.findIndex(w => getSafeId(w.word) === wordId);
-            if (idx !== -1) {
-                setSlideStatus(prev => ({ ...prev, [idx]: { ...prev[idx], heard: true } }));
-            }
-        };
-
-        const handleTyping = (idx, word, val) => {
-            const isCorrect = val.toLowerCase().trim() === word.toLowerCase();
-            setSlideStatus(prev => ({ ...prev, [idx]: { ...prev[idx], typed: isCorrect } }));
-        };
-
-        const showModal = (title, text, icon) => setModalConfig({ title, text, icon });
-        const closeModal = () => setModalConfig(null);
-
-        // --- UI 組件 ---
-        const ProgressBar = ({ progress }) => (
-            <div className="w-full bg-gray-200 rounded-full h-4 mb-4 overflow-hidden">
-                <div className="bg-blue-600 h-full progress-bar-fill" style={{ width: `${progress}%` }}></div>
-            </div>
-        );
-
-        const IntroSlide = () => (
-            <div className="flex flex-col items-center justify-center h-full text-center p-8 bg-sky-400 text-white slide">
-                <h1 className="text-7xl font-bold mb-6 animate-bounce">時間單字大冒險</h1>
-                <p className="text-2xl mb-10">同步雲端資料，開啟你的博士之路！</p>
+            // Image Generation Logic with Compression
+            const fetchOrGenerateImage = async (word, id) => {
+                if (!db || !user) return;
+                const safeId = getSafeId(word);
+                const cacheRef = window.FB.doc(db, 'artifacts', themeId, 'public', 'data', 'images', safeId);
                 
-                {batchProgress !== null ? (
-                    <div className="w-64">
-                        <p className="mb-2">正在同步資源... {batchProgress}%</p>
-                        <ProgressBar progress={batchProgress} />
-                    </div>
-                ) : (
-                    <div className="flex flex-col gap-4">
-                        <button onClick={startBatchProcess} className="bg-white text-sky-600 font-bold py-4 px-10 rounded-full text-xl shadow-lg hover:bg-sky-50 transition">
-                             🚀 一鍵雲端預載
-                        </button>
-                        <button onClick={() => setCurrentSlide(1)} className="bg-yellow-400 text-yellow-900 font-bold py-4 px-10 rounded-full text-xl shadow-lg hover:bg-yellow-300 transition">
-                            直接開始冒險
-                        </button>
-                    </div>
-                )}
-            </div>
-        );
+                try {
+                    const snap = await window.FB.getDoc(cacheRef);
+                    if (snap.exists()) {
+                        updateVocab(id, { img: snap.data().url, imgStatus: 'cached' });
+                        return snap.data().url;
+                    }
 
-        const WordSlide = ({ data, index }) => {
-            const wordId = getSafeId(data.word);
-            const media = mediaCache[wordId] || {};
-            const status = slideStatus[index] || { heard: false, typed: false };
-            const canGoNext = status.heard && status.typed;
-
-            return (
-                <div className="slide flex items-center justify-center p-8" style={{ backgroundColor: `${data.color}22` }}>
-                    <div className="card glass-card p-10 max-w-4xl w-full border-8 rounded-3xl" style={{ borderColor: data.color }}>
-                        <div className="flex justify-between items-start mb-6">
-                            <div>
-                                <span className="text-sm font-bold text-gray-400 uppercase tracking-widest">單字 ${index + 1}/${wordsData.length}</span>
-                                <h2 className="text-7xl font-bold mb-2" style={{ color: data.color }}>{data.word}</h2>
-                                <p className="text-3xl text-gray-600">{data.translation}</p>
-                            </div>
-                            <button onClick={() => playMedia(data)} className="w-24 h-24 rounded-full bg-yellow-400 flex items-center justify-center text-4xl shadow-xl hover:scale-110 transition active:scale-95">
-                                {status.heard ? "✅" : "🔊"}
-                            </button>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-                            <div className="space-y-6">
-                                <div className="p-4 border-l-4 border-blue-400 bg-blue-50">
-                                    <p className="text-2xl font-semibold mb-1">"{data.example}"</p>
-                                    <p className="text-gray-500 italic">{data.exampleCn}</p>
-                                </div>
-                                <div className="trivia-box">
-                                    <p><strong>💡 趣味小知識：</strong> {data.trivia}</p>
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                    <p className="font-bold text-blue-600">練習輸入單字：</p>
-                                    <input 
-                                        type="text" 
-                                        className={`input-practice text-3xl p-3 border-b-4 outline-none text-center transition ${status.typed ? 'border-green-500 text-green-500' : 'border-gray-200'}`}
-                                        placeholder="Type here..."
-                                        onChange={(e) => handleTyping(index, data.word, e.target.value)}
-                                    />
-                                    <p className={`text-sm font-bold ${canGoNext ? 'text-green-600' : 'text-orange-400'}`}>
-                                        {canGoNext ? "✨ 任務完成！可以前進囉！" : "任務：聽朗讀並正確輸入 📝"}
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="flex justify-center bg-gray-100 rounded-3xl overflow-hidden aspect-square relative shadow-inner">
-                                {media.image ? (
-                                    <img src={media.image} className="w-full h-full object-cover animate-fade-in" alt={data.word} />
-                                ) : (
-                                    <div className="flex flex-col items-center justify-center text-gray-400">
-                                        <p className="text-4xl animate-pulse">🖼️</p>
-                                        <p className="text-xs">雲端生成中...</p>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="flex justify-end mt-8">
-                            <button 
-                                onClick={() => setCurrentSlide(currentSlide + 1)}
-                                disabled={!canGoNext}
-                                className={`py-4 px-12 rounded-full font-bold text-xl shadow-lg transition ${canGoNext ? 'bg-blue-600 text-white hover:scale-105 active:scale-95' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
-                            >
-                                下一頁 ➔
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-
-        const QuizSlide = ({ data, qIdx }) => {
-            const [answered, setAnswered] = useState(false);
-            const [isCorrect, setIsCorrect] = useState(null);
-
-            const handleAnswer = (idx) => {
-                if (answered) return;
-                const correct = idx === data.correct;
-                setAnswered(true);
-                setIsCorrect(correct);
-                if (correct) {
-                    setDebugMsg("✅ 答對了！");
-                    showModal("太棒了！", "答對囉！你真優秀！", "🎉");
-                } else {
-                    setDebugMsg("❌ 再試一次！");
-                    showModal("再試一次！", "別灰心，再想一下下！", "💪");
-                    setTimeout(() => { setAnswered(false); setIsCorrect(null); }, 1500);
+                    updateVocab(id, { imgStatus: 'generating' });
+                    const apiKey = ""; // Injected by environment
+                    const prompt = `children's picture book style, whimsical, warm and cheerful, storytelling illustrations, ${word} concept in deep space exploration`;
+                    
+                    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`, {
+                        method: 'POST',
+                        body: JSON.stringify({ instances: { prompt }, parameters: { sampleCount: 1 } })
+                    });
+                    
+                    if (!res.ok) throw new Error("API Limit reached");
+                    const data = await res.json();
+                    const rawB64 = data.predictions[0].bytesBase64Encoded;
+                    
+                    // Canvas Compression
+                    const compressed = await compressImage(`data:image/png;base64,${rawB64}`);
+                    await window.FB.setDoc(cacheRef, { url: compressed, timestamp: Date.now() });
+                    updateVocab(id, { img: compressed, imgStatus: 'done' });
+                    return compressed;
+                } catch (e) {
+                    setDebugMsg(`⚠️ 圖片生成錯誤 (${word}): ${e.message}`);
+                    updateVocab(id, { imgStatus: 'error' });
                 }
             };
 
-            return (
-                <div className="slide bg-yellow-50 flex items-center justify-center p-8">
-                    <div className="card glass-card p-10 max-w-4xl w-full border-8 border-yellow-400 rounded-3xl">
-                        <h2 className="text-2xl font-bold text-gray-500 mb-2">終極挑戰 第 {qIdx + 1}/5 題</h2>
-                        <p className="text-4xl font-bold text-gray-800 mb-10">{data.q}</p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {data.options.map((opt, i) => (
-                                <button 
-                                    key={i} 
-                                    onClick={() => handleAnswer(i)}
-                                    className={`p-6 border-4 rounded-3xl text-2xl font-bold transition shadow-md ${answered && i === data.correct ? 'bg-green-500 text-white border-green-600' : (answered && i !== data.correct && isCorrect === false ? 'bg-red-200 border-red-400' : 'bg-white border-gray-100 hover:border-yellow-400 hover:bg-yellow-50')}`}
-                                >
-                                    {opt}
-                                </button>
-                            ))}
+            const compressImage = (src) => {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        const targetWidth = 512;
+                        const scale = targetWidth / img.width;
+                        canvas.width = targetWidth;
+                        canvas.height = img.height * scale;
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        resolve(canvas.toDataURL('image/jpeg', 0.7));
+                    };
+                    img.src = src;
+                });
+            };
+
+            // Audio Generation (TTS)
+            const playAudio = async (text, id) => {
+                if (!db || !user) {
+                    setDebugMsg("❌ 系統尚未連線");
+                    return;
+                }
+                const safeId = getSafeId(text);
+                const cacheRef = window.FB.doc(db, 'artifacts', themeId, 'public', 'data', 'audio', safeId);
+                
+                try {
+                    updateVocab(id, { audioStatus: 'loading' });
+                    const snap = await window.FB.getDoc(cacheRef);
+                    let audioData;
+
+                    if (snap.exists()) {
+                        audioData = snap.data().audio;
+                    } else {
+                        const apiKey = "";
+                        const fetchWithRetry = async (retries = 5) => {
+                            for(let i=0; i<retries; i++){
+                                try {
+                                    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`, {
+                                        method: 'POST',
+                                        body: JSON.stringify({
+                                            contents: [{ parts: [{ text: `Say clearly: ${text}` }] }],
+                                            generationConfig: { 
+                                                responseModalities: ["AUDIO"],
+                                                speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } }
+                                            }
+                                        })
+                                    });
+                                    if(res.ok) return await res.json();
+                                } catch(e) { if(i===retries-1) throw e; }
+                                await new Promise(r => setTimeout(r, Math.pow(2,i)*1000));
+                            }
+                        };
+                        const result = await fetchWithRetry();
+                        audioData = result.candidates[0].content.parts[0].inlineData.data;
+                        if (audioData.length > 100) {
+                            await window.FB.setDoc(cacheRef, { audio: audioData });
+                        }
+                    }
+
+                    if (audioData && audioData.length > 100) {
+                        decodeAndPlay(audioData);
+                        updateVocab(id, { audioStatus: 'playing' });
+                        setTimeout(() => updateVocab(id, { audioStatus: 'idle' }), 1500);
+                    } else {
+                        throw new Error("Invalid Data");
+                    }
+                } catch (e) {
+                    setDebugMsg(`⚠️ 啟動語音備援: ${text}`);
+                    const msg = new SpeechSynthesisUtterance(text);
+                    msg.lang = 'en-US';
+                    window.speechSynthesis.speak(msg);
+                    updateVocab(id, { audioStatus: 'idle' });
+                }
+            };
+
+            const decodeAndPlay = (base64) => {
+                const binary = atob(base64);
+                const buffer = new Uint8Array(binary.length + 44);
+                const view = new DataView(buffer.buffer);
+                const writeString = (o, s) => { for(let i=0; i<s.length; i++) view.setUint8(o+i, s.charCodeAt(i)); };
+                
+                writeString(0, 'RIFF');
+                view.setUint32(4, 36 + binary.length, true);
+                writeString(8, 'WAVE');
+                writeString(12, 'fmt ');
+                view.setUint32(16, 16, true);
+                view.setUint16(20, 1, true);
+                view.setUint16(22, 1, true);
+                view.setUint32(24, 24000, true);
+                view.setUint32(28, 48000, true);
+                view.setUint16(32, 2, true);
+                view.setUint16(34, 16, true);
+                writeString(36, 'data');
+                view.setUint32(40, binary.length, true);
+                
+                for(let i=0; i<binary.length; i++) buffer[44+i] = binary.charCodeAt(i);
+                const url = URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }));
+                new Audio(url).play();
+            };
+
+            const updateVocab = (id, fields) => {
+                setVocabData(prev => prev.map(item => item.id === id ? { ...item, ...fields } : item));
+            };
+
+            const handleBatchSync = async () => {
+                if (!db || !user) return;
+                setBatchLoading(true);
+                setProgress(0);
+                for (let i = 0; i < vocabData.length; i++) {
+                    const item = vocabData[i];
+                    setDebugMsg(`🚀 同步資源中: ${item.word}...`);
+                    await fetchOrGenerateImage(item.word, item.id);
+                    setProgress(Math.round(((i + 1) / vocabData.length) * 100));
+                }
+                setBatchLoading(false);
+                setDebugMsg("✅ 所有資源同步完成！");
+            };
+
+            const startQuiz = () => {
+                setQuizIndex(0);
+                setScore(0);
+                setQuizEnd(false);
+                setCurrentView('quiz');
+            };
+
+            const checkAnswer = (answer) => {
+                const correct = vocabData[quizIndex].word;
+                if (answer === correct) {
+                    setScore(s => s + 1);
+                    setDebugMsg("✨ 答對了！你真棒！");
+                } else {
+                    setDebugMsg(`🛸 差一點！正確答案是: ${correct}`);
+                }
+
+                if (quizIndex < vocabData.length - 1) {
+                    setTimeout(() => setQuizIndex(i => i + 1), 800);
+                } else {
+                    setTimeout(() => setQuizEnd(true), 800);
+                }
+            };
+
+            // Render Views
+            const renderLearn = () => (
+                <div className="space-y-8">
+                    {/* Batch Tool */}
+                    <div className="glass-card p-6 rounded-3xl shadow-soft flex flex-col md:flex-row items-center justify-between gap-4">
+                        <div>
+                            <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
+                                <RocketIcon className="w-6 h-6 text-purple-500" />
+                                資源太空站
+                            </h2>
+                            <p className="text-sm text-slate-500">一鍵同步雲端快取，享受流暢的學習體驗。</p>
                         </div>
-                        <div className="flex justify-end mt-10">
+                        <div className="flex items-center gap-4 w-full md:w-auto">
+                            {batchLoading && (
+                                <div className="flex-1 h-3 bg-slate-200 rounded-full overflow-hidden min-w-[120px]">
+                                    <div className="h-full bg-purple-400 transition-all duration-300" style={{ width: `${progress}%` }}></div>
+                                </div>
+                            )}
                             <button 
-                                onClick={() => setCurrentSlide(currentSlide + 1)}
-                                disabled={!isCorrect}
-                                className={`py-4 px-12 rounded-full font-bold text-xl transition ${isCorrect ? 'bg-orange-500 text-white shadow-lg active:scale-95' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+                                onClick={handleBatchSync}
+                                disabled={batchLoading}
+                                className="whitespace-nowrap px-8 py-3 bg-purple-500 text-white rounded-2xl font-bold shadow-lg hover:bg-purple-600 disabled:opacity-50 transition-all active:scale-95 flex items-center gap-2"
                             >
-                                下一題 ➔
+                                {batchLoading ? `⌛ 處理中 ${progress}%` : <span>一鍵合成語音與插圖</span>}
                             </button>
+                        </div>
+                    </div>
+
+                    {/* Word Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        {vocabData.map(item => (
+                            <div key={item.id} className="glass-card rounded-[2rem] overflow-hidden flex flex-col hover:shadow-2xl transition-all duration-500 group border-b-8 border-purple-100">
+                                <div className="aspect-[4/3] relative bg-slate-100 flex items-center justify-center overflow-hidden">
+                                    {item.img ? (
+                                        <img src={item.img} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={item.word} />
+                                    ) : (
+                                        <div className="text-slate-300 flex flex-col items-center">
+                                            <PlanetIcon className="w-12 h-12 mb-2 opacity-30" />
+                                            <span className="text-xs uppercase tracking-widest">{item.imgStatus === 'generating' ? 'AI Drafting...' : 'No Visual'}</span>
+                                        </div>
+                                    )}
+                                    {item.imgStatus === 'cached' && <div className="absolute top-3 right-3 bg-green-500 text-white text-[10px] px-2 py-1 rounded-full font-bold shadow-sm">✅ 已快取</div>}
+                                </div>
+                                <div className="p-6 flex-1 flex flex-col">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div>
+                                            <h3 className="text-2xl font-black text-slate-800">{item.word}</h3>
+                                            <p className="text-purple-500 font-bold">{item.zh}</p>
+                                        </div>
+                                        <button 
+                                            onClick={() => playAudio(item.word, item.id)}
+                                            className={`p-3 rounded-2xl transition shadow-md ${item.audioStatus === 'playing' ? 'bg-yellow-400 text-white' : 'macaron-yellow text-yellow-700 hover:scale-110'}`}
+                                        >
+                                            <AudioIcon className="w-6 h-6" />
+                                        </button>
+                                    </div>
+                                    <div className="mt-auto bg-white/40 p-4 rounded-2xl">
+                                        <p className="text-sm text-slate-600 leading-relaxed italic">"{item.sentence}"</p>
+                                        <p className="text-xs text-slate-400 mt-1">{item.sentenceZh}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+
+            const renderQuiz = () => {
+                if (quizEnd) {
+                    return (
+                        <div className="max-w-md mx-auto mt-20 glass-card p-12 rounded-[3rem] text-center shadow-2xl">
+                            <div className="w-24 h-24 bg-pink-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                                <StarIcon className="w-12 h-12 text-pink-500 float-anim" />
+                            </div>
+                            <h2 className="text-4xl font-black text-slate-800 mb-2">任務完成！</h2>
+                            <p className="text-slate-500 mb-8">你成功穿越了時間太空。</p>
+                            <div className="text-7xl font-black text-purple-600 mb-8">{Math.round((score / vocabData.length) * 100)}%</div>
+                            <button onClick={() => setCurrentView('learn')} className="w-full py-4 bg-slate-800 text-white rounded-2xl font-bold hover:bg-slate-700 transition">回到訓練營</button>
+                        </div>
+                    );
+                }
+
+                const current = vocabData[quizIndex];
+                const options = [...vocabData]
+                    .sort(() => Math.random() - 0.5)
+                    .slice(0, 3)
+                    .concat(current)
+                    .sort(() => Math.random() - 0.5)
+                    .filter((v, i, a) => a.findIndex(t => t.word === v.word) === i)
+                    .slice(0, 4);
+
+                return (
+                    <div className="max-w-2xl mx-auto mt-10">
+                        <div className="glass-card p-8 rounded-[2.5rem] shadow-xl">
+                            <div className="flex justify-between items-center mb-6 text-slate-400 font-bold uppercase tracking-widest text-xs">
+                                <span>Question {quizIndex + 1} / {vocabData.length}</span>
+                                <span>Score: {score}</span>
+                            </div>
+                            <div className="aspect-video bg-slate-100 rounded-3xl mb-8 overflow-hidden flex items-center justify-center relative">
+                                {current.img ? (
+                                    <img src={current.img} className="w-full h-full object-cover" alt="quiz" />
+                                ) : (
+                                    <span className="text-slate-300 italic">Visual Scanning...</span>
+                                )}
+                                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/40 p-6">
+                                    <p className="text-white font-bold text-center">"{current.sentence.replace(new RegExp(current.word, 'gi'), '_____')}"</p>
+                                </div>
+                            </div>
+                            <h3 className="text-2xl font-bold text-center text-slate-700 mb-8">這個概念對應的單字是？</h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                {options.map(opt => (
+                                    <button 
+                                        key={opt.word}
+                                        onClick={() => checkAnswer(opt.word)}
+                                        className="py-5 px-6 bg-white border-4 border-slate-50 hover:border-purple-300 hover:bg-purple-50 rounded-2xl font-black text-slate-600 transition-all text-xl shadow-sm active:scale-95"
+                                    >
+                                        {opt.word}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            return (
+                <div className="min-h-screen pb-24">
+                    {/* Top Navigation */}
+                    <nav className="p-6 flex justify-between items-center max-w-7xl mx-auto">
+                        <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 macaron-pink rounded-2xl flex items-center justify-center shadow-lg transform rotate-3">
+                                <RocketIcon className="w-7 h-7 text-pink-600" />
+                            </div>
+                            <div>
+                                <h1 className="text-xl font-black text-slate-800 leading-none">Space Time</h1>
+                                <p className="text-[10px] font-bold text-slate-400 tracking-[0.2em] uppercase">Grade 6 Academy</p>
+                            </div>
+                        </div>
+                        <div className="flex bg-slate-200/50 p-1.5 rounded-2xl gap-1">
+                            <button 
+                                onClick={() => setCurrentView('learn')} 
+                                className={`px-6 py-2 rounded-xl text-sm font-bold transition ${currentView === 'learn' ? 'bg-white text-slate-800 shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
+                            >
+                                單字探索
+                            </button>
+                            <button 
+                                onClick={startQuiz}
+                                className={`px-6 py-2 rounded-xl text-sm font-bold transition ${currentView === 'quiz' ? 'bg-white text-slate-800 shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
+                            >
+                                任務測驗
+                            </button>
+                        </div>
+                    </nav>
+
+                    <main className="max-w-7xl mx-auto px-6">
+                        {currentView === 'learn' ? renderLearn() : renderQuiz()}
+                    </main>
+
+                    {/* Footer Debug Bar - Fixed at bottom */}
+                    <div className="fixed bottom-0 left-0 right-0 h-10 bg-slate-900 text-white flex items-center px-6 justify-between text-[10px] font-mono z-[100] opacity-90 backdrop-blur-sm">
+                        <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2">
+                                <span className={`w-2 h-2 rounded-full ${db ? 'bg-green-400' : 'bg-red-400'} animate-pulse`}></span>
+                                <span>DB STATUS</span>
+                            </div>
+                            <span className="text-slate-500">|</span>
+                            <span className="text-slate-300 truncate max-w-[300px]">{debugMsg}</span>
+                        </div>
+                        <div className="hidden sm:flex items-center gap-4">
+                            <span>THEME: {themeId}</span>
+                            <span>USER: {user ? user.uid : 'ANONYMOUS'}</span>
                         </div>
                     </div>
                 </div>
             );
         };
 
-        const FinalSlide = () => (
-            <div className="slide bg-green-500 text-white flex flex-col items-center justify-center text-center p-8">
-                <h2 className="text-9xl mb-8 animate-bounce">🏆</h2>
-                <h1 className="text-7xl font-bold mb-4">大功告成！</h1>
-                <p className="text-3xl mb-12">你現在是貨真價實的時間單字博士了！</p>
-                <button onClick={() => location.reload()} className="bg-white text-green-600 font-bold py-5 px-16 rounded-full text-3xl shadow-2xl hover:scale-110 transition active:scale-95">
-                    再次挑戰
-                </button>
-            </div>
-        );
-
-        // --- Render ---
-        return (
-            <div className="w-screen h-screen overflow-hidden">
-                <div className="canvas-container w-full h-full slide-transition" style={{ transform: `translateY(-${currentSlide * 100}%)` }}>
-                    {/* Slide 0: Intro */}
-                    <IntroSlide />
-
-                    {/* Slides 1-7: Words */}
-                    {wordsData.map((w, i) => <WordSlide key={i} data={w} index={i} />)}
-
-                    {/* Slide 8: Quiz Intro */}
-                    <div className="slide bg-orange-400 text-white flex flex-col items-center justify-center text-center">
-                        <h2 className="text-7xl font-bold mb-6">🏆 測驗時間</h2>
-                        <p className="text-2xl mb-12">看看你吸收了多少知識吧！</p>
-                        <button onClick={() => setCurrentSlide(currentSlide + 1)} className="bg-white text-orange-600 font-bold py-4 px-12 rounded-full text-2xl shadow-xl hover:scale-105 transition">
-                            進入挑戰
-                        </button>
-                    </div>
-
-                    {/* Slides 9-13: Quiz */}
-                    {quizData.map((q, i) => <QuizSlide key={i} data={q} qIdx={i} />)}
-
-                    {/* Slide 14: Final */}
-                    <FinalSlide />
-                </div>
-
-                {/* Debug Bar */}
-                <div className="fixed bottom-0 left-0 right-0 bg-black/80 text-white px-4 py-1 flex justify-between items-center debug-bar">
-                    <div className="flex gap-4">
-                        <span>[APP_ID: {appId}]</span>
-                        <span>[THEME: {themeId}]</span>
-                        <span>[STATUS: {debugMsg}]</span>
-                    </div>
-                    <div className="flex gap-2 items-center">
-                        <span className={db ? "text-green-400" : "text-red-400"}>{db ? "● DB ONLINE" : "● DB OFFLINE"}</span>
-                        <span className={user ? "text-green-400" : "text-red-400"}>{user ? "● AUTH READY" : "● AUTH PENDING"}</span>
-                    </div>
-                </div>
-
-                {/* Modal Feedback */}
-                {modalConfig && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] animate-fade-in">
-                         <div className="bg-white p-10 rounded-3xl text-center shadow-2xl max-w-sm">
-                            <div className="text-6xl mb-4">{modalConfig.icon}</div>
-                            <h2 className="text-2xl font-bold mb-4">{modalConfig.title}</h2>
-                            <p className="text-gray-600 mb-6">{modalConfig.text}</p>
-                            <button onClick={closeModal} className="bg-blue-500 text-white px-8 py-2 rounded-full font-bold shadow-lg active:scale-95 transition">繼續</button>
-                        </div>
-                    </div>
-                )}
-            </div>
-        );
-    };
-
-    // --- 初始化 Render ---
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />);
-</script>
-
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
 </body>
 </html>
